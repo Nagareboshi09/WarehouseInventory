@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'add_branch_screen.dart';
 
 class MasterDataScreen extends StatefulWidget {
   const MasterDataScreen({super.key});
@@ -153,8 +154,12 @@ class _MasterDataScreenState extends State<MasterDataScreen> with SingleTickerPr
           // Add new branch or SKU based on current tab
           if (_tabController.index == 0) {
             // Add new branch
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const AddBranchScreen()),
+            ).then((_) => _loadBranches()); // Refresh list after adding
           } else {
-            // Add new SKU
+            // Add new SKU (to be implemented)
           }
         },
         child: const Icon(Icons.add),

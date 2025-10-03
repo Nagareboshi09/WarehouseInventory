@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'add_inventory_item_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -312,12 +313,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                   ],
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Navigate to add inventory item screen
-        },
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _selectedBranch != null
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddInventoryItemScreen(
+                      selectedBranch: _selectedBranch!,
+                    ),
+                  ),
+                ).then((_) => _loadInventoryItems()); // Refresh after adding
+              },
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

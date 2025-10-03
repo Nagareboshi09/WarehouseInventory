@@ -75,19 +75,50 @@ class DatabaseHelper {
     });
 
     // Insert sample branches
-    await db.insert('branches', {
+    final mainWarehouseId = await db.insert('branches', {
       'name': 'Main Warehouse',
       'location': 'Building A, Floor 1'
     });
 
-    await db.insert('branches', {
+    final secondaryId = await db.insert('branches', {
       'name': 'Secondary Storage',
       'location': 'Building B, Floor 2'
     });
 
-    await db.insert('branches', {
+    final coldStorageId = await db.insert('branches', {
       'name': 'Cold Storage',
       'location': 'Building C, Floor 1'
+    });
+
+    // Insert sample inventory items
+    await db.insert('inventory_items', {
+      'sku': 'SKU001',
+      'itemClass': 'Electronics',
+      'description': 'Smartphone iPhone 14',
+      'quantity': 25,
+      'location': 'Shelf A1',
+      'dateAdded': DateTime.now().toIso8601String(),
+      'branchId': mainWarehouseId,
+    });
+
+    await db.insert('inventory_items', {
+      'sku': 'SKU002',
+      'itemClass': 'Clothing',
+      'description': 'Cotton T-Shirt Blue',
+      'quantity': 100,
+      'location': 'Rack B2',
+      'dateAdded': DateTime.now().toIso8601String(),
+      'branchId': secondaryId,
+    });
+
+    await db.insert('inventory_items', {
+      'sku': 'SKU003',
+      'itemClass': 'Food',
+      'description': 'Frozen Chicken 5kg',
+      'quantity': 8,
+      'location': 'Freezer C1',
+      'dateAdded': DateTime.now().toIso8601String(),
+      'branchId': coldStorageId,
     });
   }
 

@@ -73,6 +73,22 @@ class DatabaseHelper {
       'password': 'admin123',
       'role': 'admin'
     });
+
+    // Insert sample branches
+    await db.insert('branches', {
+      'name': 'Main Warehouse',
+      'location': 'Building A, Floor 1'
+    });
+
+    await db.insert('branches', {
+      'name': 'Secondary Storage',
+      'location': 'Building B, Floor 2'
+    });
+
+    await db.insert('branches', {
+      'name': 'Cold Storage',
+      'location': 'Building C, Floor 1'
+    });
   }
 
   // User methods

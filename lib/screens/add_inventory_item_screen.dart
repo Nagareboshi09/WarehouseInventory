@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/models/master_item.dart';
 
 class AddInventoryItemScreen extends StatefulWidget {
   final Branch selectedBranch;
@@ -23,6 +24,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   final _quantityController = TextEditingController();
   final _locationController = TextEditingController();
   bool _isLoading = false;
+  List<MasterItem> _masterItems = [];
+  MasterItem? _selectedMasterItem;
 
   Future<void> _saveItem() async {
     if (!_formKey.currentState!.validate()) return;
@@ -72,6 +75,47 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadMasterItems();
+  }
+
+  Future<void> _loadMasterItems() async {
+    try {
+      final items = await DatabaseHelper.instance.getMasterItemsByBranch(widget.selectedBranch.id!);
+      setState(() {
+        _masterItems = items;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading master items: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onMasterItemSelected(MasterItem? item) {
+    setState(() {
+      _selectedMasterItem = item;
+      if (item != null) {
+        _skuController.text = item.sku;
+        _descriptionController.text = item.description;
+        _itemClassController.text = item.itemClass;
+        _locationController.text = item.location;
+      } else {
+        _skuController.clear();
+        _descriptionController.clear();
+        _itemClassController.clear();
+        _locationController.clear();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _skuController.dispose();
     _descriptionController.dispose();
@@ -117,6 +161,32 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              // Master Item Selection Dropdown
+              if (_masterItems.isNotEmpty) ...[
+                DropdownButtonFormField<MasterItem>(
+                  value: _selectedMasterItem,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Master Item',
+                    prefixIcon: Icon(Icons.inventory),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _masterItems.map((MasterItem item) {
+                    return DropdownMenuItem<MasterItem>(
+                      value: item,
+                      child: Text('${item.sku} - ${item.description}'),
+                    );
+                  }).toList(),
+                  onChanged: _onMasterItemSelected,
+                  validator: (value) {
+                    if (value == null && _masterItems.isNotEmpty) {
+                      return 'Please select a master item or enter details manually';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+              
               TextFormField(
                 controller: _skuController,
                 decoration: const InputDecoration(
@@ -124,6 +194,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   prefixIcon: Icon(Icons.qr_code),
                   border: OutlineInputBorder(),
                 ),
+                readOnly: _selectedMasterItem != null,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter SKU';
@@ -139,6 +210,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   prefixIcon: Icon(Icons.description),
                   border: OutlineInputBorder(),
                 ),
+                readOnly: _selectedMasterItem != null,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter description';
@@ -155,6 +227,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   prefixIcon: Icon(Icons.category),
                   border: OutlineInputBorder(),
                 ),
+                readOnly: _selectedMasterItem != null,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter item class';
@@ -189,6 +262,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                   prefixIcon: Icon(Icons.location_on),
                   border: OutlineInputBorder(),
                 ),
+                readOnly: _selectedMasterItem != null,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter location';

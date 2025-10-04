@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_inventory_item_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -96,6 +97,116 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }).toList();
       }
     });
+  }
+
+  Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
+    final TextEditingController quantityController = TextEditingController(text: item.quantity.toString());
+    bool isLoading = false;
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Update Quantity'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('SKU: ${item.sku}'),
+                  const SizedBox(height: 8),
+                  Text('Description: ${item.description}'),
+                  const SizedBox(height: 8),
+                  Text('Item Class: ${item.itemClass}'),
+                  const SizedBox(height: 8),
+                  Text('Location: ${item.location}'),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: quantityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'New Quantity',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isLoading ? null : () async {
+                    setDialogState(() {
+                      isLoading = true;
+                    });
+
+                    final newQuantity = int.tryParse(quantityController.text.trim());
+                    if (newQuantity != null && newQuantity >= 0) {
+                      try {
+                        final updatedItem = InventoryItem(
+                          id: item.id,
+                          sku: item.sku,
+                          itemClass: item.itemClass,
+                          description: item.description,
+                          quantity: newQuantity,
+                          location: item.location,
+                          dateAdded: item.dateAdded,
+                          branchId: item.branchId,
+                        );
+
+                        await DatabaseHelper.instance.updateInventoryItem(updatedItem);
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Quantity updated successfully!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          Navigator.of(context).pop();
+                          _loadInventoryItems(); // Refresh the list
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error updating quantity: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    } else {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a valid quantity'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+
+                    setDialogState(() {
+                      isLoading = false;
+                    });
+                  },
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('Update'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildBranchSelectionView() {
@@ -213,103 +324,63 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         onChanged: _filterItems,
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Row(
-                        children: [
-                          const Text(
-                            'Branch: ',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16.0,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey),
-                                borderRadius: BorderRadius.circular(8),
-                                color: Colors.grey[100],
-                              ),
-                              child: DropdownButton<Branch>(
-                                value: _selectedBranch,
-                                isExpanded: true,
-                                hint: const Text('Select a branch'),
-                                underline: Container(),
-                                items: _branches.map((Branch branch) {
-                                  return DropdownMenuItem<Branch>(
-                                    value: branch,
-                                    child: Text(
-                                      '${branch.name} (${branch.location})',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (Branch? newBranch) {
-                                  if (newBranch != null && newBranch != _selectedBranch) {
-                                    setState(() {
-                                      _selectedBranch = newBranch;
-                                    });
-                                    _loadInventoryItems();
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    buildFilterWidget(
+                      filterOptions: const [
+                        DropdownMenuItem(value: 'name', child: Text('Name / Description')),
+                        DropdownMenuItem(value: 'date', child: Text('Date Created')),
+                        DropdownMenuItem(value: 'sku', child: Text('SKU')),
+                        DropdownMenuItem(value: 'branch', child: Text('Branch')),
+                      ],
+                      onFilterApplied: (filterType, filterValue) {
+                        setState(() {
+                          _filteredItems = _inventoryItems.where((item) {
+                            switch (filterType) {
+                              case 'sku':
+                                return item.sku.toLowerCase().contains(filterValue.toLowerCase());
+                              case 'name':
+                                return item.description.toLowerCase().contains(filterValue.toLowerCase());
+                              case 'date':
+                                final formattedDate = '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+                                return formattedDate.contains(filterValue) || item.dateAdded.toIso8601String().contains(filterValue);
+                              case 'branch':
+                                return _selectedBranch?.name.toLowerCase().contains(filterValue.toLowerCase()) ?? false;
+                              default:
+                                return true;
+                            }
+                          }).toList();
+                        });
+                      },
                     ),
                     Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _loadInventoryItems,
-                        child: _filteredItems.isEmpty
-                            ? const Center(
-                                child: Text('No inventory items found'),
-                              )
-                            : ListView.builder(
+                      child: _filteredItems.isEmpty
+                          ? const Center(child: Text('No inventory items found'))
+                          : RefreshIndicator(
+                              onRefresh: _loadInventoryItems,
+                              child: ListView.builder(
                                 itemCount: _filteredItems.length,
                                 itemBuilder: (context, index) {
                                   final item = _filteredItems[index];
                                   return Card(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 16.0,
-                                      vertical: 8.0,
-                                    ),
+                                    margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                                     child: ListTile(
-                                      title: Text(
-                                        item.description,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      onTap: () => _showQuantityUpdateDialog(item),
+                                      title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
                                       subtitle: Text(
                                         'SKU: ${item.sku} | Class: ${item.itemClass}\nLocation: ${item.location}',
                                       ),
-                                      trailing: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            'Qty: ${item.quantity}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: item.quantity <= 10
-                                                  ? Colors.red
-                                                  : Colors.green,
-                                            ),
-                                          ),
-                                        ],
+                                      trailing: Text(
+                                        'Qty: ${item.quantity}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: item.quantity <= 10 ? Colors.red : Colors.green,
+                                        ),
                                       ),
                                       isThreeLine: true,
                                     ),
                                   );
                                 },
                               ),
-                      ),
+                            ),
                     ),
                   ],
                 ),

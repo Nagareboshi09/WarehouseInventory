@@ -49,6 +49,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
         final descController = TextEditingController(text: item.description);
         final classController = TextEditingController(text: item.itemClass);
         final locationController = TextEditingController(text: item.location);
+        final brandController = TextEditingController(text: item.brand ?? '');
 
         return AlertDialog(
           title: const Text('Edit Master Item'),
@@ -59,12 +60,42 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                 TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
                 TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
                 TextField(controller: classController, decoration: const InputDecoration(labelText: 'Item Class')),
+                TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
                 TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Item'),
+                    content: const Text('Are you sure you want to delete this item?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  _deleteItem(item.id!);
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
             ElevatedButton(
               onPressed: () async {
                 final updated = MasterItem(
@@ -73,6 +104,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                   description: descController.text.trim(),
                   itemClass: classController.text.trim(),
                   location: locationController.text.trim(),
+                  brand: brandController.text.trim(),
                   branchId: item.branchId,
                 );
                 await DatabaseHelper.instance.updateMasterItem(updated);
@@ -90,6 +122,54 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
   void _deleteItem(int id) async {
     await DatabaseHelper.instance.deleteMasterItem(id);
     _loadMasterItems();
+  }
+
+  void _addItem() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final skuController = TextEditingController();
+        final descController = TextEditingController();
+        final classController = TextEditingController();
+        final brandController = TextEditingController();
+        final locationController = TextEditingController(text: widget.branch.location);
+
+        return AlertDialog(
+          title: const Text('Add New Master Item'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
+                TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
+                TextField(controller: classController, decoration: const InputDecoration(labelText: 'Item Class')),
+                TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
+                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final newItem = MasterItem(
+                  sku: skuController.text.trim(),
+                  description: descController.text.trim(),
+                  itemClass: classController.text.trim(),
+                  location: locationController.text.trim(),
+                  brand: brandController.text.trim(),
+                  branchId: widget.branch.id!,
+                );
+                await DatabaseHelper.instance.createMasterItem(newItem);
+                Navigator.pop(context);
+                _loadMasterItems();
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -110,8 +190,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         title: Text(item.sku),
-                        subtitle: Text('\${item.itemClass} • \${item.description}\nLocation: \${item.location}'),
-                        isThreeLine: true,
+                        subtitle: Text('${item.itemClass} • ${item.description} • ${item.brand ?? 'No Brand'}'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -129,6 +208,10 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                     );
                   },
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addItem,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

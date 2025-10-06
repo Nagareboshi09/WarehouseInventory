@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:warehouse_inventory/models/user.dart';
@@ -10,6 +11,10 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
+  // Stream controller for notifying about data updates
+  final StreamController<String> _updateController = StreamController<String>.broadcast();
+  Stream<String> get updateStream => _updateController.stream;
+
   DatabaseHelper._init();
 
   Future<Database> get database async {
@@ -19,7 +24,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 2,
+        version: 4,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -34,7 +39,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 4, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -51,7 +56,8 @@ class DatabaseHelper {
       CREATE TABLE branches(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        location TEXT NOT NULL
+        location TEXT NOT NULL,
+        code TEXT
       )
     ''');
 
@@ -62,6 +68,7 @@ class DatabaseHelper {
         itemClass TEXT NOT NULL,
         description TEXT NOT NULL,
         location TEXT NOT NULL,
+        brand TEXT,
         branchId INTEGER NOT NULL,
         FOREIGN KEY (branchId) REFERENCES branches (id)
       )
@@ -75,6 +82,7 @@ class DatabaseHelper {
         description TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         location TEXT NOT NULL,
+        brand TEXT,
         dateAdded TEXT NOT NULL,
         branchId INTEGER NOT NULL,
         FOREIGN KEY (branchId) REFERENCES branches (id)
@@ -110,6 +118,7 @@ class DatabaseHelper {
       'itemClass': 'Electronics',
       'description': 'Smartphone iPhone 14',
       'location': 'Shelf A1',
+      'brand': 'Apple',
       'branchId': mainWarehouseId,
     });
 
@@ -118,6 +127,7 @@ class DatabaseHelper {
       'itemClass': 'Clothing',
       'description': 'Cotton T-Shirt Blue',
       'location': 'Rack B2',
+      'brand': 'Nike',
       'branchId': secondaryId,
     });
 
@@ -126,6 +136,7 @@ class DatabaseHelper {
       'itemClass': 'Food',
       'description': 'Frozen Chicken 5kg',
       'location': 'Freezer C1',
+      'brand': 'Tyson',
       'branchId': coldStorageId,
     });
 
@@ -181,6 +192,15 @@ class DatabaseHelper {
       // Insert sample master items for existing branches
       await _insertSampleData(db);
     }
+    if (oldVersion < 3) {
+      // Add code column to branches table if it doesn't exist
+      await db.execute('ALTER TABLE branches ADD COLUMN code TEXT');
+    }
+    if (oldVersion < 4) {
+      // Add brand column to master_items and inventory_items tables
+      await db.execute('ALTER TABLE master_items ADD COLUMN brand TEXT');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN brand TEXT');
+    }
   }
 
   Future<void> _insertSampleData(Database db) async {
@@ -219,6 +239,7 @@ class DatabaseHelper {
         'itemClass': 'Electronics',
         'description': 'Smartphone iPhone 14',
         'location': 'Shelf A1',
+        'brand': 'Apple',
         'branchId': mainWarehouseId,
       });
 
@@ -227,6 +248,7 @@ class DatabaseHelper {
         'itemClass': 'Clothing',
         'description': 'Cotton T-Shirt Blue',
         'location': 'Rack B2',
+        'brand': 'Nike',
         'branchId': secondaryId,
       });
 
@@ -235,6 +257,7 @@ class DatabaseHelper {
         'itemClass': 'Food',
         'description': 'Frozen Chicken 5kg',
         'location': 'Freezer C1',
+        'brand': 'Tyson',
         'branchId': coldStorageId,
       });
 
@@ -305,6 +328,7 @@ class DatabaseHelper {
       id: id,
       name: branch.name,
       location: branch.location,
+      code: branch.code,
     );
   }
 
@@ -322,12 +346,53 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [branch.id],
     );
+
+    // Notify listeners about the update
+    _updateController.add('branch_updated');
+  }
+
+  Future<void> deleteBranch(int id) async {
+    final db = await instance.database;
+    await db.delete(
+      'branches',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    // Also delete associated master items and inventory items
+    await db.delete(
+      'master_items',
+      where: 'branchId = ?',
+      whereArgs: [id],
+    );
+
+    await db.delete(
+      'inventory_items',
+      where: 'branchId = ?',
+      whereArgs: [id],
+    );
+
+    // Notify listeners about the deletion
+    _updateController.add('branch_deleted');
   }
 
   // Master Item methods
   Future<MasterItem> createMasterItem(MasterItem item) async {
     final db = await instance.database;
     final id = await db.insert('master_items', item.toMap());
+
+    // Create corresponding inventory item with default quantity 0
+    final inventoryId = await db.insert('inventory_items', {
+      'sku': item.sku,
+      'itemClass': item.itemClass,
+      'description': item.description,
+      'quantity': 0,
+      'location': item.location,
+      'brand': item.brand,
+      'dateAdded': DateTime.now().toIso8601String(),
+      'branchId': item.branchId,
+    });
+
     return item.id != null ? item : MasterItem(
       id: id,
       sku: item.sku,
@@ -340,12 +405,47 @@ class DatabaseHelper {
 
   Future<void> updateMasterItem(MasterItem item) async {
     final db = await instance.database;
+
+    // Get the old master item to find inventory items with the old sku
+    final oldItemMaps = await db.query(
+      'master_items',
+      where: 'id = ?',
+      whereArgs: [item.id],
+    );
+    final oldSku = oldItemMaps.isNotEmpty ? oldItemMaps.first['sku'] as String : item.sku;
+
     await db.update(
       'master_items',
       item.toMap(),
       where: 'id = ?',
       whereArgs: [item.id],
     );
+
+    // Update corresponding inventory items using the old sku
+    final inventoryItems = await db.query(
+      'inventory_items',
+      where: 'sku = ? AND branchId = ?',
+      whereArgs: [oldSku, item.branchId],
+    );
+
+    for (var invMap in inventoryItems) {
+      final updatedInv = {
+        'sku': item.sku,
+        'itemClass': item.itemClass,
+        'description': item.description,
+        'location': item.location,
+        'brand': item.brand,
+      };
+      await db.update(
+        'inventory_items',
+        updatedInv,
+        where: 'id = ?',
+        whereArgs: [invMap['id']],
+      );
+    }
+
+    // Notify listeners about the update
+    _updateController.add('master_item_updated');
   }
 
   Future<List<MasterItem>> getAllMasterItems() async {
@@ -409,8 +509,8 @@ class DatabaseHelper {
     final db = await instance.database;
     final result = await db.query(
       'inventory_items',
-      where: 'sku LIKE ? OR description LIKE ? OR itemClass LIKE ? OR location LIKE ?',
-      whereArgs: ['%$query%', '%$query%', '%$query%', '%$query%'],
+      where: 'sku LIKE ? OR description LIKE ? OR itemClass LIKE ?',
+      whereArgs: ['%$query%', '%$query%', '%$query%'],
     );
     return result.map((json) => InventoryItem.fromMap(json)).toList();
   }
@@ -438,5 +538,6 @@ class DatabaseHelper {
   Future<void> close() async {
     final db = await instance.database;
     db.close();
+    _updateController.close();
   }
 }

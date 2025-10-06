@@ -4,6 +4,7 @@ import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/models/master_item.dart';
 import 'package:warehouse_inventory/models/inventory_item.dart';
+import 'package:warehouse_inventory/widgets/item_form_fields.dart';
 
 class AddBranchScreen extends StatefulWidget {
   const AddBranchScreen({super.key});
@@ -15,11 +16,12 @@ class AddBranchScreen extends StatefulWidget {
 class _AddBranchScreenState extends State<AddBranchScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
+  final _branchLocationController = TextEditingController();
+  final _codeController = TextEditingController();
   final _skuController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _itemClassController = TextEditingController();
-  final _itemLocationController = TextEditingController();
+  final _brandController = TextEditingController();
   final _quantityController = TextEditingController();
   bool _isLoading = false;
   bool _addingItem = false;
@@ -30,7 +32,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     if (_skuController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty ||
         _itemClassController.text.trim().isEmpty ||
-        _itemLocationController.text.trim().isEmpty ||
         _quantityController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -56,7 +57,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       sku: _skuController.text.trim(),
       description: _descriptionController.text.trim(),
       itemClass: _itemClassController.text.trim(),
-      location: _itemLocationController.text.trim(),
+      brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
+      location: _branchLocationController.text.trim(),
       branchId: 0, // Will be updated after branch is created
     );
 
@@ -66,7 +68,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       _skuController.clear();
       _descriptionController.clear();
       _itemClassController.clear();
-      _itemLocationController.clear();
+      _brandController.clear();
       _quantityController.clear();
       _addingItem = false;
     });
@@ -91,7 +93,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         // Insert the branch first
         final branchMap = {
           'name': _nameController.text.trim(),
-          'location': _locationController.text.trim(),
+          'location': _branchLocationController.text.trim(),
+          'code': _codeController.text.trim(),
         };
         final branchId = await txn.insert('branches', branchMap);
 
@@ -105,6 +108,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             'sku': item.sku,
             'description': item.description,
             'itemClass': item.itemClass,
+            'brand': item.brand,
             'location': item.location,
             'branchId': branchId,
           };
@@ -115,6 +119,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             'sku': item.sku,
             'itemClass': item.itemClass,
             'description': item.description,
+            'brand': item.brand,
             'quantity': quantity,
             'location': item.location,
             'dateAdded': DateTime.now().toIso8601String(),
@@ -154,11 +159,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _locationController.dispose();
+    _branchLocationController.dispose();
+    _codeController.dispose();
     _skuController.dispose();
     _descriptionController.dispose();
     _itemClassController.dispose();
-    _itemLocationController.dispose();
+    _brandController.dispose();
     _quantityController.dispose();
     super.dispose();
   }
@@ -172,7 +178,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       appBar: AppBar(
         title: const Text('Add New Branch'),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
         child: Form(
           key: _formKey,
@@ -195,7 +201,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _locationController,
+                controller: _branchLocationController,
                 decoration: const InputDecoration(
                   labelText: 'Location',
                   prefixIcon: Icon(Icons.location_on),
@@ -207,6 +213,15 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   }
                   return null;
                 },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Code',
+                  prefixIcon: Icon(Icons.code),
+                  border: OutlineInputBorder(),
+                ),
               ),
               const SizedBox(height: 24),
               
@@ -240,51 +255,13 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       
                       if (_addingItem) ...[
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _skuController,
-                          decoration: const InputDecoration(
-                            labelText: 'SKU *',
-                            prefixIcon: Icon(Icons.qr_code),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _descriptionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Description *',
-                            prefixIcon: Icon(Icons.description),
-                            border: OutlineInputBorder(),
-                          ),
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _itemClassController,
-                          decoration: const InputDecoration(
-                            labelText: 'Item Class *',
-                            prefixIcon: Icon(Icons.category),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _itemLocationController,
-                          decoration: const InputDecoration(
-                            labelText: 'Location *',
-                            prefixIcon: Icon(Icons.location_on),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _quantityController,
-                          decoration: const InputDecoration(
-                            labelText: 'Quantity *',
-                            prefixIcon: Icon(Icons.inventory_2),
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
+                        ItemFormFields(
+                          skuController: _skuController,
+                          descriptionController: _descriptionController,
+                          itemClassController: _itemClassController,
+                          brandController: _brandController,
+                          quantityController: _quantityController,
+                          isReadonly: false,
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
@@ -306,7 +283,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                           final item = entry.value;
                           return ListTile(
                             title: Text('${item.sku} - ${item.description}'),
-                            subtitle: Text('${item.itemClass} - ${item.location} - Qty: ${_masterItemQuantities[index]}'),
+                            subtitle: Text('${item.itemClass}${item.brand != null && item.brand!.isNotEmpty ? ' - ${item.brand}' : ''} - ${item.location} - Qty: ${_masterItemQuantities[index]}'),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () => _removeMasterItem(index),

@@ -5,6 +5,7 @@ class InventoryItem {
   final String description;
   final int quantity;
   final String location;
+  final String? brand;
   final DateTime dateAdded;
   final int branchId;
 
@@ -15,6 +16,7 @@ class InventoryItem {
     required this.description,
     required this.quantity,
     required this.location,
+    this.brand,
     required this.dateAdded,
     required this.branchId,
   });
@@ -27,6 +29,7 @@ class InventoryItem {
       description: map['description'],
       quantity: map['quantity'],
       location: map['location'],
+      brand: map['brand'],
       dateAdded: DateTime.parse(map['dateAdded']),
       branchId: map['branchId'],
     );
@@ -40,6 +43,7 @@ class InventoryItem {
       'description': description,
       'quantity': quantity,
       'location': location,
+      'brand': brand,
       'dateAdded': dateAdded.toIso8601String(),
       'branchId': branchId,
     };

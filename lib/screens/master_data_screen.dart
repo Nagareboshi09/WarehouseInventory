@@ -70,6 +70,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                   filterOptions: const [
                     DropdownMenuItem(value: 'name', child: Text('Name')),
                     DropdownMenuItem(value: 'location', child: Text('Location')),
+                    DropdownMenuItem(value: 'code', child: Text('Code')),
                   ],
                   onFilterApplied: (filterType, filterValue) {
                     setState(() {
@@ -79,6 +80,8 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                             return branch.name.toLowerCase().contains(filterValue.toLowerCase());
                           case 'location':
                             return branch.location.toLowerCase().contains(filterValue.toLowerCase());
+                          case 'code':
+                            return branch.code?.toLowerCase().contains(filterValue.toLowerCase()) ?? false;
                           default:
                             return true;
                         }
@@ -109,22 +112,21 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  subtitle: Text('Location: ${branch.location}'),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () async {
-                                      final updated = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              EditBranchScreen(branch: branch),
-                                        ),
-                                      );
-                                      if (updated == true) {
-                                        _loadBranches();
-                                      }
-                                    },
+                                  subtitle: Text(
+                                    'Location: ${branch.location}${branch.code != null && branch.code!.isNotEmpty ? ', Code: ${branch.code}' : ''}',
                                   ),
+                                  onTap: () async {
+                                    final updated = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            EditBranchScreen(branch: branch),
+                                      ),
+                                    );
+                                    if (updated == true) {
+                                      _loadBranches();
+                                    }
+                                  },
                                 ),
                               );
                             },

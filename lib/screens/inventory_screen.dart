@@ -4,6 +4,7 @@ import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_inventory_item_screen.dart';
+import 'dart:async';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -20,11 +21,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _isLoading = true;
   bool _branchSelected = false;
   String _searchQuery = '';
+  String _branchSearchQuery = '';
+  StreamSubscription<String>? _updateSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadBranches();
+    _updateSubscription = DatabaseHelper.instance.updateStream.listen((event) {
+      if (event == 'master_item_updated' && _selectedBranch != null) {
+        _loadInventoryItems();
+      } else if (event == 'branch_updated') {
+        _loadBranches();
+      }
+    });
   }
 
   Future<void> _loadBranches() async {
@@ -33,6 +43,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
       if (mounted) {
         setState(() {
           _branches = branches;
+          // Update selected branch if it exists
+          if (_selectedBranch != null) {
+            try {
+              final updatedBranch = branches.firstWhere((branch) => branch.id == _selectedBranch!.id);
+              _selectedBranch = updatedBranch;
+            } catch (e) {
+              // Branch not found, might be deleted, so set to null
+              _selectedBranch = null;
+              _branchSelected = false;
+              _inventoryItems = [];
+              _filteredItems = [];
+            }
+          }
           _isLoading = false;
         });
       }
@@ -83,6 +106,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  void _resetBranchSelection() {
+    setState(() {
+      _selectedBranch = null;
+      _branchSelected = false;
+      _inventoryItems = [];
+      _filteredItems = [];
+      _searchQuery = '';
+    });
+  }
+
   void _filterItems(String query) {
     setState(() {
       _searchQuery = query;
@@ -93,7 +126,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return item.sku.toLowerCase().contains(query.toLowerCase()) ||
               item.description.toLowerCase().contains(query.toLowerCase()) ||
               item.itemClass.toLowerCase().contains(query.toLowerCase()) ||
-              item.location.toLowerCase().contains(query.toLowerCase());
+              (item.brand?.toLowerCase() ?? '').contains(query.toLowerCase());
         }).toList();
       }
     });
@@ -118,6 +151,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   Text('Description: ${item.description}'),
                   const SizedBox(height: 8),
                   Text('Item Class: ${item.itemClass}'),
+                  const SizedBox(height: 8),
+                  Text('Brand: ${item.brand}'),
                   const SizedBox(height: 8),
                   Text('Location: ${item.location}'),
                   const SizedBox(height: 16),
@@ -152,6 +187,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           description: item.description,
                           quantity: newQuantity,
                           location: item.location,
+                          brand: item.brand,
                           dateAdded: item.dateAdded,
                           branchId: item.branchId,
                         );
@@ -237,42 +273,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          if (_branches.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(8),
-                color: Colors.grey[100],
-              ),
-              child: DropdownButton<Branch>(
-                value: _selectedBranch,
-                isExpanded: true,
-                hint: const Text('Select a branch'),
-                underline: Container(),
-                items: _branches.map((Branch branch) {
-                  return DropdownMenuItem<Branch>(
-                    value: branch,
-                    child: Text(
-                      '${branch.name} (${branch.location})',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (Branch? newBranch) {
-                  if (newBranch != null) {
-                    setState(() {
-                      _selectedBranch = newBranch;
-                    });
-                    _loadInventoryItems();
-                  }
-                },
-              ),
-            ),
+          if (_branches.isNotEmpty) ..._getBranchSelectionWidgets(),
           if (_branches.isEmpty)
             const Padding(
               padding: EdgeInsets.only(top: 16),
@@ -293,7 +294,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Warehouse Inventory'),
+        title: Text(_branchSelected ? '${_selectedBranch?.name} Inventory' : 'Warehouse Inventory'),
+        leading: _branchSelected
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _resetBranchSelection,
+              )
+            : null,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -306,7 +313,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       child: TextField(
                         decoration: InputDecoration(
                           labelText: 'Search Inventory',
-                          hintText: 'Search by SKU, name, class, or location',
+                          hintText: 'Search by SKU, name, or class',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -366,7 +373,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       onTap: () => _showQuantityUpdateDialog(item),
                                       title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
                                       subtitle: Text(
-                                        'SKU: ${item.sku} | Class: ${item.itemClass}\nLocation: ${item.location}',
+                                        'SKU: ${item.sku} | Class: ${item.itemClass} | Brand: ${item.brand}',
                                       ),
                                       trailing: Text(
                                         'Qty: ${item.quantity}',
@@ -375,7 +382,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           color: item.quantity <= 10 ? Colors.red : Colors.green,
                                         ),
                                       ),
-                                      isThreeLine: true,
+                                      isThreeLine: false,
                                     ),
                                   );
                                 },
@@ -384,21 +391,120 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                   ],
                 ),
-      floatingActionButton: _selectedBranch != null
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddInventoryItemScreen(
-                      selectedBranch: _selectedBranch!,
-                    ),
-                  ),
-                ).then((_) => _loadInventoryItems()); // Refresh after adding
-              },
-              child: const Icon(Icons.add),
-            )
-          : null,
+      floatingActionButton: null,
     );
+  }
+
+  @override
+  void dispose() {
+    _updateSubscription?.cancel();
+    super.dispose();
+  }
+
+  List<Widget> _getBranchSelectionWidgets() {
+    List<Branch> filteredBranches = _branches.where((branch) {
+      return branch.name.toLowerCase().contains(_branchSearchQuery.toLowerCase()) ||
+          branch.location.toLowerCase().contains(_branchSearchQuery.toLowerCase());
+    }).toList();
+    return [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: TextField(
+          decoration: InputDecoration(
+            labelText: 'Search Branches',
+            hintText: 'Search by name or location',
+            prefixIcon: const Icon(Icons.search),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            suffixIcon: _branchSearchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      setState(() {
+                        _branchSearchQuery = '';
+                      });
+                      FocusScope.of(context).unfocus();
+                    },
+                  )
+                : null,
+          ),
+          onChanged: (value) {
+            setState(() {
+              _branchSearchQuery = value;
+            });
+          },
+        ),
+      ),
+      if (_branchSearchQuery.isNotEmpty && filteredBranches.isNotEmpty)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: filteredBranches.length,
+            itemBuilder: (context, index) {
+              final branch = filteredBranches[index];
+              return ListTile(
+                title: Text('${branch.name} (${branch.location})'),
+                onTap: () {
+                  setState(() {
+                    _selectedBranch = branch;
+                    _branchSearchQuery = '';
+                  });
+                  _loadInventoryItems();
+                },
+              );
+            },
+          ),
+        ),
+      const SizedBox(height: 16),
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey[100],
+        ),
+        child: DropdownButton<Branch>(
+          value: _selectedBranch,
+          isExpanded: true,
+          hint: const Text('Select a branch'),
+          underline: Container(),
+          items: _branches.map((Branch branch) {
+            return DropdownMenuItem<Branch>(
+              value: branch,
+              child: Text(
+                '${branch.name} (${branch.location})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: (Branch? newBranch) {
+            if (newBranch != null) {
+              setState(() {
+                _selectedBranch = newBranch;
+              });
+              _loadInventoryItems();
+            }
+          },
+        ),
+      ),
+    ];
   }
 }

@@ -19,6 +19,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _locationController;
+  late TextEditingController _codeController;
   bool _isLoading = false;
 
   @override
@@ -26,6 +27,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.branch.name);
     _locationController = TextEditingController(text: widget.branch.location);
+    _codeController = TextEditingController(text: widget.branch.code);
   }
 
   Future<void> _updateBranch() async {
@@ -40,6 +42,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
         id: widget.branch.id,
         name: _nameController.text.trim(),
         location: _locationController.text.trim(),
+        code: _codeController.text.trim().isEmpty ? null : _codeController.text.trim(),
       );
 
       await DatabaseHelper.instance.updateBranch(updatedBranch);
@@ -71,10 +74,66 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     }
   }
 
+  Future<void> _deleteBranch() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Branch'),
+        content: const Text('Are you sure you want to delete this branch? This will also delete all associated master items and inventory items.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await DatabaseHelper.instance.deleteBranch(widget.branch.id!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Branch deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true); // Return true to indicate success
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting branch: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _locationController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -123,17 +182,16 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _updateBranch,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Code',
+                  prefixIcon: Icon(Icons.code),
+                  border: OutlineInputBorder(),
                 ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Update Branch'),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               ElevatedButton.icon(
                 icon: const Icon(Icons.manage_search),
                 label: const Text('Edit Master Items for this Branch'),
@@ -157,6 +215,26 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            onPressed: _isLoading ? null : _deleteBranch,
+            heroTag: 'delete',
+            backgroundColor: Colors.red,
+            child: const Icon(Icons.delete),
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton(
+            onPressed: _isLoading ? null : _updateBranch,
+            heroTag: 'save',
+            child: _isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Icon(Icons.save),
+          ),
+        ],
       ),
     );
   }

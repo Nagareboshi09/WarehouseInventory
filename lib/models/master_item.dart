@@ -4,6 +4,7 @@ class MasterItem {
   final String itemClass;
   final String description;
   final String location;
+  final String? brand;
   final int branchId;
 
   MasterItem({
@@ -12,6 +13,7 @@ class MasterItem {
     required this.itemClass,
     required this.description,
     required this.location,
+    this.brand,
     required this.branchId,
   });
 
@@ -22,6 +24,7 @@ class MasterItem {
       itemClass: map['itemClass'],
       description: map['description'],
       location: map['location'],
+      brand: map['brand'],
       branchId: map['branchId'],
     );
   }
@@ -33,6 +36,7 @@ class MasterItem {
       'itemClass': itemClass,
       'description': description,
       'location': location,
+      'brand': brand,
       'branchId': branchId,
     };
   }

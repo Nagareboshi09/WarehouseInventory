@@ -2,11 +2,13 @@ class Branch {
   final int? id;
   final String name;
   final String location;
+  final String? code;
 
   Branch({
     this.id,
     required this.name,
     required this.location,
+    this.code,
   });
 
   factory Branch.fromMap(Map<String, dynamic> map) {
@@ -14,6 +16,7 @@ class Branch {
       id: map['id'],
       name: map['name'],
       location: map['location'],
+      code: map['code'],
     );
   }
 
@@ -22,6 +25,7 @@ class Branch {
       'id': id,
       'name': name,
       'location': location,
+      'code': code,
     };
   }
 }

@@ -4,6 +4,7 @@ extension FilterExtension on State {
   Widget buildFilterWidget({
     required List<DropdownMenuItem<String>> filterOptions,
     required Function(String, String) onFilterApplied,
+    Function()? onReset,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -46,6 +47,14 @@ extension FilterExtension on State {
               );
             },
           ),
+          if (onReset != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: onReset,
+              tooltip: 'Reset Filter',
+            ),
+          ],
         ],
       ),
     );

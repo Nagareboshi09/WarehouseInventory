@@ -88,6 +88,11 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                       }).toList();
                     });
                   },
+                  onReset: () {
+                    setState(() {
+                      _filteredBranches = List.from(_branches);
+                    });
+                  },
                 ),
                 Expanded(
                   child: RefreshIndicator(

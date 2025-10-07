@@ -357,6 +357,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           }).toList();
                         });
                       },
+                      onReset: () {
+                        setState(() {
+                          _filteredItems = List.from(_inventoryItems);
+                        });
+                      },
                     ),
                     Expanded(
                       child: _filteredItems.isEmpty

@@ -268,7 +268,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             'Please select a branch to view inventory items',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey,
+              color: Color.fromARGB(255, 107, 104, 104),
             ),
             textAlign: TextAlign.center,
           ),

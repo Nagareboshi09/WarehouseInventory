@@ -4,6 +4,8 @@ import 'package:warehouse_inventory/screens/dashboard_screen.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
 import 'package:warehouse_inventory/screens/master_data_screen.dart';
 import 'package:warehouse_inventory/screens/settings_screen.dart';
+import 'package:warehouse_inventory/screens/order_screen.dart';
+import 'package:warehouse_inventory/screens/order_list_screen.dart';
 import 'package:warehouse_inventory/screens/login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -22,6 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
     const DashboardScreen(),
     const MasterDataScreen(),
     const InventoryScreen(),
+    const OrderScreen(),
+    const OrderListScreen(),
     const SettingsScreen(),
   ];
 
@@ -114,12 +118,34 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
+              leading: const Icon(Icons.shopping_cart),
+              title: const Text('Orders'),
               selected: _selectedIndex == 3,
               onTap: () {
                 setState(() {
                   _selectedIndex = 3;
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.list_alt),
+              title: const Text('Order List'),
+              selected: _selectedIndex == 4,
+              onTap: () {
+                setState(() {
+                  _selectedIndex = 4;
+                });
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings),
+              title: const Text('Settings'),
+              selected: _selectedIndex == 5,
+              onTap: () {
+                setState(() {
+                  _selectedIndex = 5;
                 });
                 Navigator.pop(context);
               },

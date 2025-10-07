@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:warehouse_inventory/theme_notifier.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,7 +14,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isDarkMode = false;
   bool _isOfflineMode = false;
 
   @override
@@ -32,21 +33,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _isDarkMode = prefs.getBool('darkMode') ?? false;
       _isOfflineMode = prefs.getBool('offlineMode') ?? false;
     });
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('darkMode', _isDarkMode);
     await prefs.setBool('offlineMode', _isOfflineMode);
-    
+
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Settings saved successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _changePassword() async {
+    final current = _currentPasswordController.text.trim();
+    final newPass = _newPasswordController.text.trim();
+    final confirm = _confirmPasswordController.text.trim();
+
+    if (current.isEmpty || newPass.isEmpty || confirm.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All fields are required')),
+      );
+      return;
+    }
+
+    if (newPass != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New passwords do not match')),
+      );
+      return;
+    }
+
+    // Load current password
+    final prefs = await SharedPreferences.getInstance();
+    final storedPassword = prefs.getString('password') ?? 'admin123';
+
+    if (current != storedPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Current password is incorrect')),
+      );
+      return;
+    }
+
+    // Save new password
+    await prefs.setString('password', newPass);
+
+    _currentPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Password changed successfully'),
         backgroundColor: Colors.green,
       ),
     );
@@ -78,12 +124,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SwitchListTile(
                     title: const Text('Dark Mode'),
                     subtitle: const Text('Enable dark theme for the app'),
-                    value: _isDarkMode,
-                    onChanged: (value) {
-                      setState(() {
-                        _isDarkMode = value;
-                      });
-                    },
+                    value: context.watch<ThemeNotifier>().isDarkMode,
+                    onChanged: (value) => context.read<ThemeNotifier>().setDarkMode(value),
                   ),
                   const Divider(),
                   SwitchListTile(
@@ -141,9 +183,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () {
-                        // Change password logic
-                      },
+                      onPressed: _changePassword,
                       child: const Text('Change Password'),
                     ),
                   ],

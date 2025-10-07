@@ -1,29 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/dashboard_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/master_data_screen.dart';
 import 'screens/settings_screen.dart';
+import 'theme_notifier.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const WarehouseInventoryApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeNotifier(),
+      child: const WarehouseInventoryApp(),
+    ),
+  );
 }
 
-class WarehouseInventoryApp extends StatelessWidget {
+class WarehouseInventoryApp extends StatefulWidget {
   const WarehouseInventoryApp({super.key});
 
   @override
+  State<WarehouseInventoryApp> createState() => _WarehouseInventoryAppState();
+}
+
+class _WarehouseInventoryAppState extends State<WarehouseInventoryApp> {
+  @override
+  void initState() {
+    super.initState();
+    context.read<ThemeNotifier>().loadTheme();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Warehouse Inventory',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      debugShowCheckedModeBanner: false,
-      home: const LoginScreen(),
+    return Consumer<ThemeNotifier>(
+      builder: (context, themeNotifier, child) {
+        return MaterialApp(
+          title: 'Warehouse Inventory',
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+            useMaterial3: true,
+          ),
+          darkTheme: ThemeData.dark(
+            useMaterial3: true,
+          ),
+          themeMode: themeNotifier.themeMode,
+          debugShowCheckedModeBanner: false,
+          home: const LoginScreen(),
+        );
+      },
     );
   }
 }
@@ -39,12 +66,26 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String _password = 'admin123';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPassword();
+  }
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPassword() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _password = prefs.getString('password') ?? 'admin123';
+    });
   }
 
   void _login() {
@@ -59,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
       });
   
-      if (_usernameController.text == 'admin' && _passwordController.text == 'admin123') {
+      if (_usernameController.text == 'admin' && _passwordController.text == _password) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomeScreen()),

@@ -481,7 +481,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey),
           borderRadius: BorderRadius.circular(8),
-          color: Colors.grey[100],
+          color: const Color.fromARGB(255, 94, 84, 84),
         ),
         child: DropdownButton<Branch>(
           value: _selectedBranch,

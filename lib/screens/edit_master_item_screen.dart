@@ -47,7 +47,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
       builder: (context) {
         final skuController = TextEditingController(text: item.sku);
         final descController = TextEditingController(text: item.description);
-        final classController = TextEditingController(text: item.itemClass);
         final locationController = TextEditingController(text: item.location);
         final brandController = TextEditingController(text: item.brand ?? '');
 
@@ -59,7 +58,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
               children: [
                 TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
                 TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
-                TextField(controller: classController, decoration: const InputDecoration(labelText: 'Item Class')),
                 TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
                 TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
               ],
@@ -102,7 +100,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                   id: item.id,
                   sku: skuController.text.trim(),
                   description: descController.text.trim(),
-                  itemClass: classController.text.trim(),
                   location: locationController.text.trim(),
                   brand: brandController.text.trim(),
                   branchId: item.branchId,
@@ -130,7 +127,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
       builder: (context) {
         final skuController = TextEditingController();
         final descController = TextEditingController();
-        final classController = TextEditingController();
         final brandController = TextEditingController();
         final locationController = TextEditingController(text: widget.branch.location);
 
@@ -142,7 +138,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
               children: [
                 TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
                 TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
-                TextField(controller: classController, decoration: const InputDecoration(labelText: 'Item Class')),
                 TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
                 TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
               ],
@@ -155,7 +150,6 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                 final newItem = MasterItem(
                   sku: skuController.text.trim(),
                   description: descController.text.trim(),
-                  itemClass: classController.text.trim(),
                   location: locationController.text.trim(),
                   brand: brandController.text.trim(),
                   branchId: widget.branch.id!,
@@ -190,7 +184,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         title: Text(item.sku),
-                        subtitle: Text('${item.itemClass} • ${item.description} • ${item.brand ?? 'No Brand'}'),
+                        subtitle: Text('${item.description} • ${item.brand ?? 'No Brand'}'),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

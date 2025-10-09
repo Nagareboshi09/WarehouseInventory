@@ -22,7 +22,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _skuController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _itemClassController = TextEditingController();
   final _quantityController = TextEditingController();
   final _locationController = TextEditingController();
   final _brandController = TextEditingController();
@@ -40,9 +39,8 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     try {
       final item = InventoryItem(
         sku: _skuController.text.trim(),
-        itemClass: _itemClassController.text.trim(),
         description: _descriptionController.text.trim(),
-        quantity: int.parse(_quantityController.text.trim()),
+        end: int.parse(_quantityController.text.trim()),
         location: _locationController.text.trim(),
         brand: _brandController.text.trim(),
         dateAdded: DateTime.now(),
@@ -108,13 +106,11 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
       if (item != null) {
         _skuController.text = item.sku;
         _descriptionController.text = item.description;
-        _itemClassController.text = item.itemClass;
         _locationController.text = item.location;
         _brandController.text = item.brand ?? '';
       } else {
         _skuController.clear();
         _descriptionController.clear();
-        _itemClassController.clear();
         _locationController.clear();
         _brandController.clear();
       }
@@ -125,7 +121,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   void dispose() {
     _skuController.dispose();
     _descriptionController.dispose();
-    _itemClassController.dispose();
     _quantityController.dispose();
     _locationController.dispose();
     _brandController.dispose();
@@ -284,37 +279,19 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                                       maxLines: 1,
                                     ),
                                     const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            'Class: ${item.itemClass}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[700],
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
+                                    if (item.brand != null && item.brand!.isNotEmpty) ...[
+                                      Flexible(
+                                        child: Text(
+                                          'Brand: ${item.brand}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[700],
                                           ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
                                         ),
-                                        if (item.brand != null && item.brand!.isNotEmpty) ...[
-                                          const SizedBox(width: 8),
-                                          const Text('•', style: TextStyle(fontSize: 12)),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                              'Brand: ${item.brand}',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[700],
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -363,7 +340,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                       ItemFormFields(
                         skuController: _skuController,
                         descriptionController: _descriptionController,
-                        itemClassController: _itemClassController,
                         brandController: _brandController,
                         quantityController: _quantityController,
                         isReadonly: _selectedMasterItem != null,
@@ -376,12 +352,6 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
                         descriptionValidator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter description';
-                          }
-                          return null;
-                        },
-                        itemClassValidator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter item class';
                           }
                           return null;
                         },

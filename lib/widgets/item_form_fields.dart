@@ -4,13 +4,11 @@ import 'package:flutter/services.dart';
 class ItemFormFields extends StatelessWidget {
   final TextEditingController skuController;
   final TextEditingController descriptionController;
-  final TextEditingController itemClassController;
   final TextEditingController? brandController;
   final TextEditingController quantityController;
   final bool isReadonly;
   final FormFieldValidator<String>? skuValidator;
   final FormFieldValidator<String>? descriptionValidator;
-  final FormFieldValidator<String>? itemClassValidator;
   final FormFieldValidator<String>? brandValidator;
   final FormFieldValidator<String>? quantityValidator;
   final List<TextInputFormatter>? quantityInputFormatters;
@@ -19,13 +17,11 @@ class ItemFormFields extends StatelessWidget {
     super.key,
     required this.skuController,
     required this.descriptionController,
-    required this.itemClassController,
     this.brandController,
     required this.quantityController,
     this.isReadonly = false,
     this.skuValidator,
     this.descriptionValidator,
-    this.itemClassValidator,
     this.brandValidator,
     this.quantityValidator,
     this.quantityInputFormatters,
@@ -56,17 +52,6 @@ class ItemFormFields extends StatelessWidget {
           readOnly: isReadonly,
           validator: descriptionValidator,
           maxLines: 2,
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: itemClassController,
-          decoration: const InputDecoration(
-            labelText: 'Item Class *',
-            prefixIcon: Icon(Icons.category),
-            border: OutlineInputBorder(),
-          ),
-          readOnly: isReadonly,
-          validator: itemClassValidator,
         ),
         if (brandController != null) ...[
           const SizedBox(height: 16),

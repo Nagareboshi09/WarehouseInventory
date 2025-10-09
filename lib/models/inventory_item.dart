@@ -1,9 +1,8 @@
 class InventoryItem {
   final int? id;
   final String sku;
-  final String itemClass;
   final String description;
-  final int quantity;
+  final int end;
   final String location;
   final String? brand;
   final DateTime dateAdded;
@@ -12,9 +11,8 @@ class InventoryItem {
   InventoryItem({
     this.id,
     required this.sku,
-    required this.itemClass,
     required this.description,
-    required this.quantity,
+    required this.end,
     required this.location,
     this.brand,
     required this.dateAdded,
@@ -25,9 +23,8 @@ class InventoryItem {
     return InventoryItem(
       id: map['id'],
       sku: map['sku'],
-      itemClass: map['itemClass'],
       description: map['description'],
-      quantity: map['quantity'],
+      end: map['end'],
       location: map['location'],
       brand: map['brand'],
       dateAdded: DateTime.parse(map['dateAdded']),
@@ -39,9 +36,8 @@ class InventoryItem {
     return {
       'id': id,
       'sku': sku,
-      'itemClass': itemClass,
       'description': description,
-      'quantity': quantity,
+      'end': end,
       'location': location,
       'brand': brand,
       'dateAdded': dateAdded.toIso8601String(),

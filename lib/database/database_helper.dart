@@ -24,7 +24,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 4,
+        version: 7,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -39,7 +39,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 4, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 7, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -65,7 +65,6 @@ class DatabaseHelper {
       CREATE TABLE master_items(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sku TEXT NOT NULL,
-        itemClass TEXT NOT NULL,
         description TEXT NOT NULL,
         location TEXT NOT NULL,
         brand TEXT,
@@ -78,9 +77,8 @@ class DatabaseHelper {
       CREATE TABLE inventory_items(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sku TEXT NOT NULL,
-        itemClass TEXT NOT NULL,
         description TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
+        end INTEGER NOT NULL,
         location TEXT NOT NULL,
         brand TEXT,
         dateAdded TEXT NOT NULL,
@@ -115,7 +113,6 @@ class DatabaseHelper {
     // Insert sample master items
     await db.insert('master_items', {
       'sku': 'SKU001',
-      'itemClass': 'Electronics',
       'description': 'Smartphone iPhone 14',
       'location': 'Shelf A1',
       'brand': 'Apple',
@@ -124,7 +121,6 @@ class DatabaseHelper {
 
     await db.insert('master_items', {
       'sku': 'SKU002',
-      'itemClass': 'Clothing',
       'description': 'Cotton T-Shirt Blue',
       'location': 'Rack B2',
       'brand': 'Nike',
@@ -133,7 +129,6 @@ class DatabaseHelper {
 
     await db.insert('master_items', {
       'sku': 'SKU003',
-      'itemClass': 'Food',
       'description': 'Frozen Chicken 5kg',
       'location': 'Freezer C1',
       'brand': 'Tyson',
@@ -143,9 +138,8 @@ class DatabaseHelper {
     // Insert sample inventory items
     await db.insert('inventory_items', {
       'sku': 'SKU001',
-      'itemClass': 'Electronics',
       'description': 'Smartphone iPhone 14',
-      'quantity': 25,
+      'end': 25,
       'location': 'Shelf A1',
       'dateAdded': DateTime.now().toIso8601String(),
       'branchId': mainWarehouseId,
@@ -153,9 +147,8 @@ class DatabaseHelper {
 
     await db.insert('inventory_items', {
       'sku': 'SKU002',
-      'itemClass': 'Clothing',
       'description': 'Cotton T-Shirt Blue',
-      'quantity': 100,
+      'end': 100,
       'location': 'Rack B2',
       'dateAdded': DateTime.now().toIso8601String(),
       'branchId': secondaryId,
@@ -163,9 +156,8 @@ class DatabaseHelper {
 
     await db.insert('inventory_items', {
       'sku': 'SKU003',
-      'itemClass': 'Food',
       'description': 'Frozen Chicken 5kg',
-      'quantity': 8,
+      'end': 8,
       'location': 'Freezer C1',
       'dateAdded': DateTime.now().toIso8601String(),
       'branchId': coldStorageId,
@@ -181,7 +173,6 @@ class DatabaseHelper {
         CREATE TABLE IF NOT EXISTS master_items(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           sku TEXT NOT NULL,
-          itemClass TEXT NOT NULL,
           description TEXT NOT NULL,
           location TEXT NOT NULL,
           branchId INTEGER NOT NULL,
@@ -200,6 +191,117 @@ class DatabaseHelper {
       // Add brand column to master_items and inventory_items tables
       await db.execute('ALTER TABLE master_items ADD COLUMN brand TEXT');
       await db.execute('ALTER TABLE inventory_items ADD COLUMN brand TEXT');
+    }
+    if (oldVersion < 7) {
+      // Force recreate master_items and inventory_items tables to fix schema issues
+      
+      // Fix master_items table
+      final masterTableInfo = await db.rawQuery("PRAGMA table_info(master_items)");
+      final hasMasterLegacyColumns = masterTableInfo.any((column) =>
+        column['name'] == 'itemClassCode' || column['name'] == 'itemClass'
+      );
+      
+      if (hasMasterLegacyColumns || masterTableInfo.isEmpty) {
+        try {
+          await db.execute('''
+            CREATE TABLE master_items_new(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              sku TEXT NOT NULL,
+              description TEXT NOT NULL,
+              location TEXT NOT NULL,
+              brand TEXT,
+              branchId INTEGER NOT NULL,
+              FOREIGN KEY (branchId) REFERENCES branches (id)
+            )
+          ''');
+          
+          try {
+            await db.execute('''
+              INSERT INTO master_items_new (id, sku, description, location, brand, branchId)
+              SELECT id, sku, description, location, brand, branchId FROM master_items
+            ''');
+          } catch (e) {
+            print('Could not copy master_items data: $e');
+          }
+          
+          await db.execute('DROP TABLE IF EXISTS master_items');
+          await db.execute('ALTER TABLE master_items_new RENAME TO master_items');
+        } catch (e) {
+          print('Error recreating master_items table: $e');
+          await db.execute('DROP TABLE IF EXISTS master_items');
+          await db.execute('''
+            CREATE TABLE master_items(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              sku TEXT NOT NULL,
+              description TEXT NOT NULL,
+              location TEXT NOT NULL,
+              brand TEXT,
+              branchId INTEGER NOT NULL,
+              FOREIGN KEY (branchId) REFERENCES branches (id)
+            )
+          ''');
+        }
+      }
+      
+      // Fix inventory_items table
+      final invTableInfo = await db.rawQuery("PRAGMA table_info(inventory_items)");
+      final hasEndColumn = invTableInfo.any((column) => column['name'] == 'end');
+      
+      if (!hasEndColumn || invTableInfo.isEmpty) {
+        try {
+          await db.execute('''
+            CREATE TABLE inventory_items_new(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              sku TEXT NOT NULL,
+              description TEXT NOT NULL,
+              end INTEGER NOT NULL,
+              location TEXT NOT NULL,
+              brand TEXT,
+              dateAdded TEXT NOT NULL,
+              branchId INTEGER NOT NULL,
+              FOREIGN KEY (branchId) REFERENCES branches (id)
+            )
+          ''');
+          
+          try {
+            // Try to copy with 'end' column if it exists
+            await db.execute('''
+              INSERT INTO inventory_items_new (id, sku, description, end, location, brand, dateAdded, branchId)
+              SELECT id, sku, description, end, location, brand, dateAdded, branchId FROM inventory_items
+            ''');
+          } catch (e) {
+            print('Could not copy inventory_items data with end column: $e');
+            // Try alternative column names
+            try {
+              await db.execute('''
+                INSERT INTO inventory_items_new (id, sku, description, end, location, brand, dateAdded, branchId)
+                SELECT id, sku, description, quantity, location, brand, dateAdded, branchId FROM inventory_items
+              ''');
+            } catch (e2) {
+              print('Could not copy inventory_items data: $e2');
+            }
+          }
+          
+          await db.execute('DROP TABLE IF EXISTS inventory_items');
+          await db.execute('ALTER TABLE inventory_items_new RENAME TO inventory_items');
+        } catch (e) {
+          print('Error recreating inventory_items table: $e');
+          await db.execute('DROP TABLE IF EXISTS inventory_items');
+          await db.execute('''
+            CREATE TABLE inventory_items(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              sku TEXT NOT NULL,
+              description TEXT NOT NULL,
+              end INTEGER NOT NULL,
+              location TEXT NOT NULL,
+              brand TEXT,
+              dateAdded TEXT NOT NULL,
+              branchId INTEGER NOT NULL,
+              FOREIGN KEY (branchId) REFERENCES branches (id)
+            )
+          ''');
+        }
+      }
     }
   }
 
@@ -236,7 +338,6 @@ class DatabaseHelper {
       // Insert sample master items
       await db.insert('master_items', {
         'sku': 'SKU001',
-        'itemClass': 'Electronics',
         'description': 'Smartphone iPhone 14',
         'location': 'Shelf A1',
         'brand': 'Apple',
@@ -245,7 +346,6 @@ class DatabaseHelper {
 
       await db.insert('master_items', {
         'sku': 'SKU002',
-        'itemClass': 'Clothing',
         'description': 'Cotton T-Shirt Blue',
         'location': 'Rack B2',
         'brand': 'Nike',
@@ -254,7 +354,6 @@ class DatabaseHelper {
 
       await db.insert('master_items', {
         'sku': 'SKU003',
-        'itemClass': 'Food',
         'description': 'Frozen Chicken 5kg',
         'location': 'Freezer C1',
         'brand': 'Tyson',
@@ -264,9 +363,8 @@ class DatabaseHelper {
       // Insert sample inventory items
       await db.insert('inventory_items', {
         'sku': 'SKU001',
-        'itemClass': 'Electronics',
         'description': 'Smartphone iPhone 14',
-        'quantity': 25,
+        'end': 25,
         'location': 'Shelf A1',
         'dateAdded': DateTime.now().toIso8601String(),
         'branchId': mainWarehouseId,
@@ -274,9 +372,8 @@ class DatabaseHelper {
 
       await db.insert('inventory_items', {
         'sku': 'SKU002',
-        'itemClass': 'Clothing',
         'description': 'Cotton T-Shirt Blue',
-        'quantity': 100,
+        'end': 100,
         'location': 'Rack B2',
         'dateAdded': DateTime.now().toIso8601String(),
         'branchId': secondaryId,
@@ -284,9 +381,8 @@ class DatabaseHelper {
 
       await db.insert('inventory_items', {
         'sku': 'SKU003',
-        'itemClass': 'Food',
         'description': 'Frozen Chicken 5kg',
-        'quantity': 8,
+        'end': 8,
         'location': 'Freezer C1',
         'dateAdded': DateTime.now().toIso8601String(),
         'branchId': coldStorageId,
@@ -384,9 +480,8 @@ class DatabaseHelper {
     // Create corresponding inventory item with default quantity 0
     final inventoryId = await db.insert('inventory_items', {
       'sku': item.sku,
-      'itemClass': item.itemClass,
       'description': item.description,
-      'quantity': 0,
+      'end': 0,
       'location': item.location,
       'brand': item.brand,
       'dateAdded': DateTime.now().toIso8601String(),
@@ -396,7 +491,6 @@ class DatabaseHelper {
     return item.id != null ? item : MasterItem(
       id: id,
       sku: item.sku,
-      itemClass: item.itemClass,
       description: item.description,
       location: item.location,
       branchId: item.branchId,
@@ -431,7 +525,6 @@ class DatabaseHelper {
     for (var invMap in inventoryItems) {
       final updatedInv = {
         'sku': item.sku,
-        'itemClass': item.itemClass,
         'description': item.description,
         'location': item.location,
         'brand': item.brand,
@@ -480,9 +573,8 @@ class DatabaseHelper {
     return item.id != null ? item : InventoryItem(
       id: id,
       sku: item.sku,
-      itemClass: item.itemClass,
       description: item.description,
-      quantity: item.quantity,
+      end: item.end,
       location: item.location,
       dateAdded: item.dateAdded,
       branchId: item.branchId,
@@ -509,8 +601,8 @@ class DatabaseHelper {
     final db = await instance.database;
     final result = await db.query(
       'inventory_items',
-      where: 'sku LIKE ? OR description LIKE ? OR itemClass LIKE ?',
-      whereArgs: ['%$query%', '%$query%', '%$query%'],
+      where: 'sku LIKE ? OR `description` LIKE ?',
+      whereArgs: ['%$query%', '%$query%'],
     );
     return result.map((json) => InventoryItem.fromMap(json)).toList();
   }
@@ -519,7 +611,7 @@ class DatabaseHelper {
     final db = await instance.database;
     final result = await db.query(
       'inventory_items',
-      where: 'quantity <= ?',
+      where: 'end <= ?',
       whereArgs: [threshold],
     );
     return result.map((json) => InventoryItem.fromMap(json)).toList();
@@ -536,8 +628,9 @@ class DatabaseHelper {
   }
 
   Future<void> close() async {
-    final db = await instance.database;
-    db.close();
-    _updateController.close();
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/widgets/item_form_fields.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
+import 'package:csv/csv.dart';
+import 'dart:convert';
+import 'dart:io';
 
 class AddBranchScreen extends StatefulWidget {
   const AddBranchScreen({super.key});
@@ -20,7 +22,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   final _codeController = TextEditingController();
   final _skuController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _itemClassController = TextEditingController();
   final _brandController = TextEditingController();
   final _quantityController = TextEditingController();
   bool _isLoading = false;
@@ -31,7 +32,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   void _addMasterItem() {
     if (_skuController.text.trim().isEmpty ||
         _descriptionController.text.trim().isEmpty ||
-        _itemClassController.text.trim().isEmpty ||
         _quantityController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -56,7 +56,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     final masterItem = MasterItem(
       sku: _skuController.text.trim(),
       description: _descriptionController.text.trim(),
-      itemClass: _itemClassController.text.trim(),
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       location: _branchLocationController.text.trim(),
       branchId: 0, // Will be updated after branch is created
@@ -67,7 +66,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       _masterItemQuantities.add(quantity);
       _skuController.clear();
       _descriptionController.clear();
-      _itemClassController.clear();
       _brandController.clear();
       _quantityController.clear();
       _addingItem = false;
@@ -77,7 +75,251 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   void _removeMasterItem(int index) {
     setState(() {
       _masterItems.removeAt(index);
+      _masterItemQuantities.removeAt(index);
     });
+  }
+
+  Future<void> _importFromExcel() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv', 'xlsx'],
+      );
+
+      if (result != null) {
+        final filePath = result.files.single.path!;
+        final file = File(filePath);
+        final ext = filePath.split('.').last.toLowerCase();
+
+        // Build a unified rows structure for both .xlsx and .csv
+        List<List<dynamic>> rows = [];
+
+        if (ext == 'csv') {
+          // Try multiple encodings since CSV files can have different encodings
+          String raw;
+          try {
+            raw = file.readAsStringSync(encoding: utf8);
+          } catch (e) {
+            // If UTF-8 fails, try Latin-1 (ISO-8859-1) which is common for CSV files
+            try {
+              raw = file.readAsStringSync(encoding: latin1);
+            } catch (e2) {
+              // If Latin-1 also fails, try Windows-1252
+              try {
+                final bytes = file.readAsBytesSync();
+                raw = String.fromCharCodes(bytes);
+              } catch (e3) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to read CSV file. Please ensure it\'s a valid text file.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+            }
+          }
+
+          raw = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+          final firstLine = raw.split('\n').isNotEmpty ? raw.split('\n').first : '';
+          final delimiter = firstLine.contains(';') ? ';' : ',';
+          print('DEBUG: CSV first line: "$firstLine"');
+          print('DEBUG: Detected delimiter: "$delimiter"');
+          final converter = CsvToListConverter(fieldDelimiter: delimiter, eol: '\n');
+          rows = converter.convert(raw);
+          print('DEBUG: Parsed ${rows.length} rows from CSV');
+        } else if (ext == 'xlsx') {
+          final bytes = file.readAsBytesSync();
+          final decoder = SpreadsheetDecoder.decodeBytes(bytes);
+          final sheet = decoder.tables[decoder.tables.keys.first];
+          if (sheet == null) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No data found in the Excel file'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+          rows = sheet.rows;
+        } else if (ext == 'xls') {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Excel .xls files are not supported. Please save your file as .xlsx or export as CSV and try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unsupported file type. Please select a .xlsx or .csv file'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Read headers from first row
+        if (rows.isEmpty || rows[0].isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Excel file must have headers in the first row'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        // Helpers to normalize headers and extract cell text
+        String normalizeHeader(String s) =>
+            s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        String cellText(dynamic c) {
+          try {
+            if (c == null) return '';
+            if (c is num || c is String) return c.toString();
+            // Some spreadsheet decoders expose a .value property
+            // ignore: avoid_dynamic_calls
+            final v = c.value;
+            return v?.toString() ?? '';
+          } catch (_) {
+            return c?.toString() ?? '';
+          }
+        }
+
+        final headerRow = rows[0];
+        Map<String, int> headerMap = {};
+
+        for (var i = 0; i < headerRow.length; i++) {
+          final rawHeader = cellText(headerRow[i]);
+          final key = normalizeHeader(rawHeader);
+          if (key.isNotEmpty) {
+            headerMap[key] = i;
+          }
+        }
+
+        // Check for required headers (case-insensitive, normalized) aligned to sample:
+        // A: SKU, B: ITEM DESCRIPTION, C: END
+        final skuIndex = headerMap['sku'] ?? headerMap['itemcode'];
+        final descriptionIndex = headerMap['itemdescription'] ??
+            headerMap['description'] ??
+            headerMap['desc'] ??
+            headerMap['itemname'];
+        final brandIndex = headerMap['brand'] ?? headerMap['manufacturer'];
+        final quantityIndex = headerMap['end'] ??
+            headerMap['quantity'] ??
+            headerMap['qty'] ??
+            headerMap['stock'];
+
+        // Debug: Show detected headers
+        print('DEBUG: Detected headers: $headerMap');
+        print('DEBUG: skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
+
+        if (skuIndex == null || descriptionIndex == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Excel file must have "SKU" and "Description" columns. Found headers: ${headerMap.keys.join(", ")}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        List<MasterItem> importedItems = [];
+        List<int> importedQuantities = [];
+
+        for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+          final row = rows[rowIndex];
+          print('DEBUG: Processing row $rowIndex: ${row.map(cellText).toList()}');
+
+          if (row.length <= skuIndex || row.length <= descriptionIndex) {
+            print('DEBUG: Skipping row $rowIndex - insufficient columns');
+            continue;
+          }
+
+          final sku = cellText(row[skuIndex]).trim();
+          final description = cellText(row[descriptionIndex]).trim();
+          final brandRaw = (brandIndex != null && row.length > brandIndex)
+              ? cellText(row[brandIndex]).trim()
+              : null;
+          final qtyStr = (quantityIndex != null && row.length > quantityIndex)
+              ? cellText(row[quantityIndex]).replaceAll(',', '').trim()
+              : '';
+          final qty = qtyStr.isEmpty ? null : num.tryParse(qtyStr)?.round();
+
+          print('DEBUG: Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
+
+          // Skip section headers like "Bronco" rows without SKU or empty description
+          if (sku.isEmpty || description.isEmpty) {
+            print('DEBUG: Skipping row $rowIndex - empty SKU or description');
+            continue;
+          }
+
+          // Auto-extract brand from first word of description if brand is empty
+          String? finalBrand = (brandRaw != null && brandRaw.isNotEmpty) ? brandRaw : null;
+          if (finalBrand == null && description.isNotEmpty) {
+            // Extract first word from description as brand
+            final words = description.split(' ');
+            if (words.isNotEmpty) {
+              finalBrand = words.first.trim();
+              print('DEBUG: Auto-extracted brand "$finalBrand" from description');
+            }
+          }
+
+          // Allow items with null or any numeric quantity (including 0)
+          print('DEBUG: Adding item from row $rowIndex');
+
+          final masterItem = MasterItem(
+            sku: sku,
+            description: description,
+            brand: finalBrand,
+            location: _branchLocationController.text.trim(),
+            branchId: 0,
+          );
+
+          importedItems.add(masterItem);
+          importedQuantities.add(qty ?? 0); // Use 0 as default for the list, but preserve null for DB
+        }
+
+        print('DEBUG: Total items processed: ${rows.length - 1}, valid items found: ${importedItems.length}');
+
+        if (importedItems.isEmpty) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No valid items found in the Excel file. Check that your file has SKU and Description columns with data.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _masterItems.addAll(importedItems);
+          _masterItemQuantities.addAll(importedQuantities);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Imported ${importedItems.length} items from Excel'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error importing Excel: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _saveBranch() async {
@@ -102,25 +344,23 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         for (var i = 0; i < _masterItems.length; i++) {
           var item = _masterItems[i];
           var quantity = _masterItemQuantities[i];
-          
+
           // Insert into master_items
           final masterItemMap = {
             'sku': item.sku,
             'description': item.description,
-            'itemClass': item.itemClass,
             'brand': item.brand,
             'location': item.location,
             'branchId': branchId,
           };
           await txn.insert('master_items', masterItemMap);
 
-          // Insert into inventory_items
+          // Insert into inventory_items - handle null quantity
           final inventoryItemMap = {
             'sku': item.sku,
-            'itemClass': item.itemClass,
             'description': item.description,
             'brand': item.brand,
-            'quantity': quantity,
+            'end': quantity, // Will be 0 if quantity was null during import
             'location': item.location,
             'dateAdded': DateTime.now().toIso8601String(),
             'branchId': branchId,
@@ -163,7 +403,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     _codeController.dispose();
     _skuController.dispose();
     _descriptionController.dispose();
-    _itemClassController.dispose();
     _brandController.dispose();
     _quantityController.dispose();
     super.dispose();
@@ -224,7 +463,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
+
               // Master Items Section
               Card(
                 child: Padding(
@@ -242,23 +481,32 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          IconButton(
-                            icon: Icon(_addingItem ? Icons.remove : Icons.add),
-                            onPressed: () {
-                              setState(() {
-                                _addingItem = !_addingItem;
-                              });
-                            },
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.file_upload),
+                                tooltip: 'Import from Excel',
+                                onPressed: _importFromExcel,
+                              ),
+                              IconButton(
+                                icon: Icon(_addingItem ? Icons.remove : Icons.add),
+                                tooltip: _addingItem ? 'Cancel Add' : 'Add Item',
+                                onPressed: () {
+                                  setState(() {
+                                    _addingItem = !_addingItem;
+                                  });
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      
+
                       if (_addingItem) ...[
                         const SizedBox(height: 16),
                         ItemFormFields(
                           skuController: _skuController,
                           descriptionController: _descriptionController,
-                          itemClassController: _itemClassController,
                           brandController: _brandController,
                           quantityController: _quantityController,
                           isReadonly: false,
@@ -270,7 +518,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
-                      
+
                       if (_masterItems.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         const Text(
@@ -283,7 +531,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                           final item = entry.value;
                           return ListTile(
                             title: Text('${item.sku} - ${item.description}'),
-                            subtitle: Text('${item.itemClass}${item.brand != null && item.brand!.isNotEmpty ? ' - ${item.brand}' : ''} - ${item.location} - Qty: ${_masterItemQuantities[index]}'),
+                            subtitle: Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location} - Qty: ${_masterItemQuantities[index]}'),
                             trailing: IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () => _removeMasterItem(index),
@@ -295,7 +543,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _saveBranch,

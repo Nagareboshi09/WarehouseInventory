@@ -125,7 +125,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _filteredItems = _inventoryItems.where((item) {
           return item.sku.toLowerCase().contains(query.toLowerCase()) ||
               item.description.toLowerCase().contains(query.toLowerCase()) ||
-              item.itemClass.toLowerCase().contains(query.toLowerCase()) ||
+              
               (item.brand?.toLowerCase() ?? '').contains(query.toLowerCase());
         }).toList();
       }
@@ -133,7 +133,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
-    final TextEditingController quantityController = TextEditingController(text: item.quantity.toString());
+    final TextEditingController quantityController = TextEditingController(text: item.end.toString());
     bool isLoading = false;
 
     await showDialog(
@@ -150,7 +150,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   const SizedBox(height: 8),
                   Text('Description: ${item.description}'),
                   const SizedBox(height: 8),
-                  Text('Item Class: ${item.itemClass}'),
+                  
                   const SizedBox(height: 8),
                   Text('Brand: ${item.brand}'),
                   const SizedBox(height: 8),
@@ -183,9 +183,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         final updatedItem = InventoryItem(
                           id: item.id,
                           sku: item.sku,
-                          itemClass: item.itemClass,
+                          
                           description: item.description,
-                          quantity: newQuantity,
+                          end: newQuantity,
                           location: item.location,
                           brand: item.brand,
                           dateAdded: item.dateAdded,
@@ -313,7 +313,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       child: TextField(
                         decoration: InputDecoration(
                           labelText: 'Search Inventory',
-                          hintText: 'Search by SKU, name, or class',
+                          hintText: 'Search by SKU or name',
                           prefixIcon: const Icon(Icons.search),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -378,13 +378,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       onTap: () => _showQuantityUpdateDialog(item),
                                       title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
                                       subtitle: Text(
-                                        'SKU: ${item.sku} | Class: ${item.itemClass} | Brand: ${item.brand}',
+                                        'SKU: ${item.sku} | Brand: ${item.brand}',
                                       ),
                                       trailing: Text(
-                                        'Qty: ${item.quantity}',
+                                        'Qty: ${item.end}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: item.quantity <= 10 ? Colors.red : Colors.green,
+                                          color: item.end <= 10 ? Colors.red : Colors.green,
                                         ),
                                       ),
                                       isThreeLine: false,

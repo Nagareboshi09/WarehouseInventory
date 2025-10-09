@@ -1,7 +1,6 @@
 class MasterItem {
   final int? id;
   final String sku;
-  final String itemClass;
   final String description;
   final String location;
   final String? brand;
@@ -10,7 +9,6 @@ class MasterItem {
   MasterItem({
     this.id,
     required this.sku,
-    required this.itemClass,
     required this.description,
     required this.location,
     this.brand,
@@ -21,7 +19,6 @@ class MasterItem {
     return MasterItem(
       id: map['id'],
       sku: map['sku'],
-      itemClass: map['itemClass'],
       description: map['description'],
       location: map['location'],
       brand: map['brand'],
@@ -33,7 +30,6 @@ class MasterItem {
     return {
       'id': id,
       'sku': sku,
-      'itemClass': itemClass,
       'description': description,
       'location': location,
       'brand': brand,

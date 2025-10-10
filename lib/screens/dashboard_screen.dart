@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/models/order.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Branch? _selectedBranch;
   int _totalItems = 0;
   int _lowStockItems = 0;
+  List<Order> _orders = [];
   bool _isLoading = true;
 
   @override
@@ -53,11 +55,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     try {
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
+      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
       int total = items.length;
       int lowStock = items.where((item) => item.end <= 10).length;
       setState(() {
         _totalItems = total;
         _lowStockItems = lowStock;
+        _orders = orders;
         _isLoading = false;
       });
     } catch (e) {
@@ -120,26 +124,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: Align(
                         alignment: Alignment.topCenter,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            _buildInfoCard(
-                              'Total Items',
-                              _totalItems.toString(),
-                              Icons.inventory,
-                              Colors.blue.shade400,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildAnimatedInfoCard(
+                                  'Total Items',
+                                  _totalItems.toString(),
+                                  Icons.inventory,
+                                  Colors.blue.shade400,
+                                ),
+                                const SizedBox(width: 16.0),
+                                _buildAnimatedInfoCard(
+                                  'Low Stock Items',
+                                  _lowStockItems.toString(),
+                                  Icons.warning,
+                                  Colors.orange.shade400,
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 16.0),
-                            _buildInfoCard(
-                              'Low Stock Items',
-                              _lowStockItems.toString(),
-                              Icons.warning,
-                              Colors.orange.shade400,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                            const SizedBox(height: 24.0),
+                            if (_orders.isNotEmpty) ...[
+                              Text(
+                                'Ordered Products',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 8.0),
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 200),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: _orders.length,
+                                  itemBuilder: (context, index) {
+                                    final order = _orders[index];
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(vertical: 4.0),
+                                      child: ListTile(
+                                        leading: Icon(
+                                          Icons.shopping_cart,
+                                          color: Colors.green.shade600,
+                                        ),
+                                        title: Text('${order.brand} - Item ${order.itemId}'),
+                                        subtitle: Text('Quantity: ${order.quantity} • Status: ${order.status}'),
+                                        trailing: Text(
+                                          '${order.dateOrdered.day}/${order.dateOrdered.month}/${order.dateOrdered.year}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ] else ...[
+                              Text(
+                                'No orders for this branch',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -151,55 +206,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildInfoCard(String title, String value, IconData icon, Color color, [VoidCallback? onTap]) {
-    final card = Card(
-      elevation: 4.0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: Container(
-        width: 150,
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 40,
-              color: color,
-            ),
-            const SizedBox(height: 8.0),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+  Widget _buildAnimatedInfoCard(String title, String value, IconData icon, Color color, [VoidCallback? onTap]) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Card(
+          elevation: 4.0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: 150,
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12.0),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  color.withOpacity(0.1),
+                  color.withOpacity(0.05),
+                ],
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 4.0),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              textAlign: TextAlign.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Icon(
+                    icon,
+                    key: ValueKey(icon),
+                    size: 40,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 8.0),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4.0),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: Text(
+                    value,
+                    key: ValueKey(value),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
-
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: card,
-      );
-    } else {
-      return card;
-    }
   }
 
 }

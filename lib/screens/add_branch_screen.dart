@@ -132,8 +132,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               ? raw.split('\n').first
               : '';
           final delimiter = firstLine.contains(';') ? ';' : ',';
-          print('DEBUG: CSV first line: "$firstLine"');
-          print('DEBUG: Detected delimiter: "$delimiter"');
+          _logger.fine('CSV first line: "$firstLine"');
+          _logger.fine('Detected delimiter: "$delimiter"');
           final converter = CsvToListConverter(fieldDelimiter: delimiter, eol: '\n');
           rows = converter.convert(raw);
           _logger.fine('Parsed ${rows.length} rows from CSV');
@@ -251,8 +251,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             headerMap['stock'];
 
         // Debug: Show detected headers
-        print('DEBUG: Detected headers: $headerMap');
-        print('DEBUG: skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
+        _logger.fine('Detected headers: $headerMap');
+        _logger.fine('skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
 
         if (skuIndex == null || descriptionIndex == null) {
           if (!mounted) return;
@@ -272,7 +272,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
         for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
           final row = rows[rowIndex];
-          print('DEBUG: Processing row $rowIndex: ${row.map(cellText).toList()}');
+          _logger.fine('Processing row $rowIndex: ${row.map(cellText).toList()}');
 
           if (row.length <= skuIndex || row.length <= descriptionIndex) {
             _logger.fine('Skipping row $rowIndex - insufficient columns');
@@ -289,7 +289,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               : '';
           final qty = qtyStr.isEmpty ? null : num.tryParse(qtyStr)?.round();
 
-          print('DEBUG: Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
+          _logger.fine('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
 
           // Skip section headers like "Bronco" rows without SKU or empty description
           if (sku.isEmpty || description.isEmpty) {
@@ -306,7 +306,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             final words = description.split(' ');
             if (words.isNotEmpty) {
               finalBrand = words.first.trim();
-              print('DEBUG: Auto-extracted brand "$finalBrand" from description');
+              _logger.fine('Auto-extracted brand "$finalBrand" from description');
             }
           }
 
@@ -327,7 +327,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           ); // Use 0 as default for the list, but preserve null for DB
         }
 
-        print('DEBUG: Total items processed: ${rows.length - 1}, valid items found: ${importedItems.length}');
+        _logger.fine('Total items processed: ${rows.length - 1}, valid items found: ${importedItems.length}');
 
         if (importedItems.isEmpty) {
           if (!mounted) return;
@@ -837,33 +837,27 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 ),
                               ),
 
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveBranch,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Add Branch'),
+                              const SizedBox(height: 24),
+                              ElevatedButton(
+                                onPressed: _isLoading ? null : _saveBranch,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(color: Colors.white)
+                                    : const Text('Add Branch'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLoading ? null : _saveBranch,
-        icon: _isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Icon(Icons.add),
-        label: Text(_isLoading ? 'Adding...' : 'Add Branch'),
       ),
     );
   }

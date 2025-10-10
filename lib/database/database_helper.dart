@@ -5,6 +5,7 @@ import 'package:warehouse_inventory/models/user.dart';
 import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/models/master_item.dart';
+import 'package:warehouse_inventory/models/order.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class DatabaseHelper {
@@ -24,7 +25,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 7,
+        version: 8,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -39,7 +40,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 7, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 8, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -192,6 +193,40 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE master_items ADD COLUMN brand TEXT');
       await db.execute('ALTER TABLE inventory_items ADD COLUMN brand TEXT');
     }
+    if (oldVersion < 6) {
+      // Add orders table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS orders(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          branchId INTEGER NOT NULL,
+          location TEXT NOT NULL,
+          brand TEXT NOT NULL,
+          itemId INTEGER NOT NULL,
+          quantity INTEGER NOT NULL,
+          dateOrdered TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          batchId TEXT,
+          FOREIGN KEY (branchId) REFERENCES branches (id)
+        )
+      ''');
+    }
+    if (oldVersion < 8) {
+      // Add orders table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS orders(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          branchId INTEGER NOT NULL,
+          location TEXT NOT NULL,
+          brand TEXT NOT NULL,
+          itemId INTEGER NOT NULL,
+          quantity INTEGER NOT NULL,
+          dateOrdered TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          batchId TEXT,
+          FOREIGN KEY (branchId) REFERENCES branches (id)
+        )
+      ''');
+    }
     if (oldVersion < 7) {
       // Force recreate master_items and inventory_items tables to fix schema issues
       
@@ -297,6 +332,21 @@ class DatabaseHelper {
               brand TEXT,
               dateAdded TEXT NOT NULL,
               branchId INTEGER NOT NULL,
+              FOREIGN KEY (branchId) REFERENCES branches (id)
+            )
+          ''');
+      
+          await db.execute('''
+            CREATE TABLE orders(
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              branchId INTEGER NOT NULL,
+              location TEXT NOT NULL,
+              brand TEXT NOT NULL,
+              itemId INTEGER NOT NULL,
+              quantity INTEGER NOT NULL,
+              dateOrdered TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              batchId TEXT,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
@@ -624,6 +674,58 @@ class DatabaseHelper {
       item.toMap(),
       where: 'id = ?',
       whereArgs: [item.id],
+    );
+  }
+
+  // Order methods
+  Future<Order> createOrder(Order order) async {
+    final db = await instance.database;
+    final id = await db.insert('orders', order.toMap());
+    return order.id != null ? order : Order(
+      id: id,
+      branchId: order.branchId,
+      location: order.location,
+      brand: order.brand,
+      itemId: order.itemId,
+      quantity: order.quantity,
+      dateOrdered: order.dateOrdered,
+      status: order.status,
+      batchId: order.batchId,
+    );
+  }
+
+  Future<List<Order>> getAllOrders() async {
+    final db = await instance.database;
+    final result = await db.query('orders');
+    return result.map((json) => Order.fromMap(json)).toList();
+  }
+
+  Future<List<Order>> getOrdersByBranch(int branchId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'orders',
+      where: 'branchId = ?',
+      whereArgs: [branchId],
+    );
+    return result.map((json) => Order.fromMap(json)).toList();
+  }
+
+  Future<void> updateOrder(Order order) async {
+    final db = await instance.database;
+    await db.update(
+      'orders',
+      order.toMap(),
+      where: 'id = ?',
+      whereArgs: [order.id],
+    );
+  }
+
+  Future<void> deleteOrder(int id) async {
+    final db = await instance.database;
+    await db.delete(
+      'orders',
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 

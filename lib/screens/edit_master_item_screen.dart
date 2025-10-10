@@ -15,11 +15,19 @@ class EditMasterItemScreen extends StatefulWidget {
 class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
   bool _isLoading = true;
   List<MasterItem> _masterItems = [];
+  String _searchQuery = '';
+  TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadMasterItems();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMasterItems() async {
@@ -166,6 +174,17 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
     );
   }
 
+  List<MasterItem> _getFilteredItems() {
+    if (_searchQuery.isEmpty) {
+      return _masterItems;
+    }
+    return _masterItems.where((item) {
+      return item.sku.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             item.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+             (item.brand?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -174,34 +193,55 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _masterItems.isEmpty
-              ? const Center(child: Text('No master items found'))
-              : ListView.builder(
-                  itemCount: _masterItems.length,
-                  itemBuilder: (context, index) {
-                    final item = _masterItems[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        title: Text(item.sku),
-                        subtitle: Text('${item.description} • ${item.brand ?? 'No Brand'}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                              onPressed: () => _editItem(item),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              onPressed: () => _deleteItem(item.id!),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search items...',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
                 ),
+                Expanded(
+                  child: _getFilteredItems().isEmpty
+                      ? Center(child: Text(_searchQuery.isNotEmpty ? 'No items match your search' : 'No master items found'))
+                      : ListView.builder(
+                          itemCount: _getFilteredItems().length,
+                          itemBuilder: (context, index) {
+                            final item = _getFilteredItems()[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              child: ListTile(
+                                title: Text(item.sku),
+                                subtitle: Text('${item.description} • ${item.brand ?? 'No Brand'}'),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                                      onPressed: () => _editItem(item),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                      onPressed: () => _deleteItem(item.id!),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addItem,
         child: const Icon(Icons.add),

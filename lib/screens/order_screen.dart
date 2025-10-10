@@ -17,13 +17,14 @@ class OrderScreen extends StatefulWidget {
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _locationController = TextEditingController();
-  final _quantityController = TextEditingController();
   bool _isLoading = false;
   List<Branch> _branches = [];
   List<MasterItem> _masterItems = [];
   Branch? _selectedBranch;
-  MasterItem? _selectedItem;
-  String? _selectedBrand;
+  Map<int, TextEditingController> _quantityControllers = {};
+  Map<int, int> _orderQuantities = {};
+  String _searchQuery = '';
+  List<MasterItem> _filteredItems = [];
 
   @override
   void initState() {
@@ -34,11 +35,12 @@ class _OrderScreenState extends State<OrderScreen> {
   Future<void> _loadData() async {
     try {
       final branches = await DatabaseHelper.instance.getAllBranches();
-      final masterItems = await DatabaseHelper.instance.getAllMasterItems();
       setState(() {
         _branches = branches;
-        _masterItems = masterItems;
       });
+      if (_selectedBranch != null) {
+        await _loadMasterItems();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -51,44 +53,119 @@ class _OrderScreenState extends State<OrderScreen> {
     }
   }
 
+  Future<void> _loadMasterItems() async {
+    if (_selectedBranch == null) return;
+    try {
+      final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(
+        _selectedBranch!.id!,
+      );
+      setState(() {
+        _masterItems = masterItems;
+        _filteredItems = masterItems;
+        // Initialize controllers for each item
+        _quantityControllers.clear();
+        _orderQuantities.clear();
+        for (var item in masterItems) {
+          _quantityControllers[item.id!] = TextEditingController();
+          _orderQuantities[item.id!] = 0;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading master items: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _filterItems(String query) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredItems = _masterItems;
+      } else {
+        _filteredItems = _masterItems.where((item) {
+          return item.sku.toLowerCase().contains(query.toLowerCase()) ||
+              item.description.toLowerCase().contains(query.toLowerCase()) ||
+              (item.brand?.toLowerCase() ?? '').contains(query.toLowerCase());
+        }).toList();
+      }
+    });
+  }
+
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Check if at least one item has quantity > 0
+    bool hasOrders = _orderQuantities.values.any((qty) => qty > 0);
+    if (!hasOrders) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter quantity for at least one item'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
-    // Create order object
-    final order = Order(
-      branchId: _selectedBranch!.id!,
-      location: _locationController.text.trim(),
-      brand: _selectedBrand!,
-      itemId: _selectedItem!.id!,
-      quantity: int.parse(_quantityController.text.trim()),
-      dateOrdered: DateTime.now(),
-    );
+    // Generate a unique batch ID for this order session
+    final batchId = DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Add order to provider
-    context.read<OrderProvider>().addOrder(order);
+    // Create orders for each item with quantity > 0
+    List<Order> orders = [];
+    for (var item in _masterItems) {
+      int quantity = _orderQuantities[item.id!] ?? 0;
+      if (quantity > 0) {
+        final order = Order(
+          branchId: _selectedBranch!.id!,
+          location: _locationController.text.trim(),
+          brand: item.brand ?? '',
+          itemId: item.id!,
+          quantity: quantity,
+          dateOrdered: DateTime.now(),
+          batchId: batchId,
+        );
+        orders.add(order);
+      }
+    }
+
+    // Add orders to provider
+    for (var order in orders) {
+      context.read<OrderProvider>().addOrder(order);
+    }
 
     // Simulate order submission
     await Future.delayed(const Duration(seconds: 1));
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Order submitted successfully!'),
+        SnackBar(
+          content: Text('${orders.length} order(s) submitted successfully!'),
           backgroundColor: Colors.green,
         ),
       );
       // Reset form
       _formKey.currentState!.reset();
       _locationController.clear();
-      _quantityController.clear();
+      // Clear quantities
+      for (var controller in _quantityControllers.values) {
+        controller.clear();
+      }
       setState(() {
-        _selectedBranch = null;
-        _selectedItem = null;
-        _selectedBrand = null;
+        _orderQuantities.clear();
+        for (var item in _masterItems) {
+          _orderQuantities[item.id!] = 0;
+        }
+        _searchQuery = '';
+        _filteredItems = _masterItems;
       });
     }
 
@@ -97,18 +174,12 @@ class _OrderScreenState extends State<OrderScreen> {
     });
   }
 
-  List<String> get _availableBrands {
-    return _masterItems
-        .where((item) => item.brand != null && item.brand!.isNotEmpty)
-        .map((item) => item.brand!)
-        .toSet()
-        .toList();
-  }
-
   @override
   void dispose() {
     _locationController.dispose();
-    _quantityController.dispose();
+    for (var controller in _quantityControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -143,7 +214,10 @@ class _OrderScreenState extends State<OrderScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.shopping_cart, color: Colors.blue.shade700),
+                          Icon(
+                            Icons.shopping_cart,
+                            color: Colors.blue.shade700,
+                          ),
                           const SizedBox(width: 8),
                           const Text(
                             'Order Details',
@@ -175,6 +249,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             _selectedBranch = value;
                             _locationController.text = value?.location ?? '';
                           });
+                          _loadMasterItems();
                         },
                         validator: (value) {
                           if (value == null) {
@@ -200,83 +275,121 @@ class _OrderScreenState extends State<OrderScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // Brand Dropdown
-                      DropdownButtonFormField<String>(
-                        value: _selectedBrand,
-                        decoration: const InputDecoration(
-                          labelText: 'Brand *',
-                          prefixIcon: Icon(Icons.branding_watermark),
-                          border: OutlineInputBorder(),
+                      // Items List
+                      if (_selectedBranch != null &&
+                          _masterItems.isNotEmpty) ...[
+                        const Text(
+                          'Select Items to Order',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        menuMaxHeight: 200,
-                        items: _availableBrands.map((String brand) {
-                          return DropdownMenuItem<String>(
-                            value: brand,
-                            child: Text(brand),
-                          );
-                        }).toList(),
-                        onChanged: (String? value) {
-                          setState(() {
-                            _selectedBrand = value;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please select a brand';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      // Item Dropdown
-                      DropdownButtonFormField<MasterItem>(
-                        value: _selectedItem,
-                        decoration: const InputDecoration(
-                          labelText: 'Item *',
-                          prefixIcon: Icon(Icons.inventory),
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 8),
+                        TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Search Items',
+                            hintText: 'Search by SKU, name, or brand',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _filterItems('');
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onChanged: _filterItems,
                         ),
-                        menuMaxHeight: 200,
-                        items: _masterItems.map((MasterItem item) {
-                          return DropdownMenuItem<MasterItem>(
-                            value: item,
-                            child: Text('${item.sku} - ${item.description}'),
-                          );
-                        }).toList(),
-                        onChanged: (MasterItem? value) {
-                          setState(() {
-                            _selectedItem = value;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Please select an item';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      // Quantity TextField
-                      TextFormField(
-                        controller: _quantityController,
-                        decoration: const InputDecoration(
-                          labelText: 'Quantity *',
-                          prefixIcon: Icon(Icons.numbers),
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 300,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: ListView.builder(
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, index) {
+                              final item = _filteredItems[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.description,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              'SKU: ${item.sku} | Brand: ${item.brand ?? 'N/A'}',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade600,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 80,
+                                        child: TextField(
+                                          controller:
+                                              _quantityControllers[item.id!],
+                                          decoration: const InputDecoration(
+                                            labelText: 'Qty',
+                                            border: OutlineInputBorder(),
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 8,
+                                                ),
+                                          ),
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _orderQuantities[item.id!] =
+                                                  int.tryParse(value) ?? 0;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Please enter quantity';
-                          }
-                          final quantity = int.tryParse(value.trim());
-                          if (quantity == null || quantity <= 0) {
-                            return 'Please enter a valid quantity greater than 0';
-                          }
-                          return null;
-                        },
-                      ),
+                      ] else if (_selectedBranch != null &&
+                          _masterItems.isEmpty) ...[
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text('No items available for this branch'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

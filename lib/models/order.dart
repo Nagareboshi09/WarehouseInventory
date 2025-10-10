@@ -7,6 +7,7 @@ class Order {
   int quantity;
   DateTime dateOrdered;
   String status;
+  String? batchId;
 
   Order({
     this.id,
@@ -17,6 +18,7 @@ class Order {
     required this.quantity,
     required this.dateOrdered,
     this.status = 'pending',
+    this.batchId,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +31,7 @@ class Order {
       'quantity': quantity,
       'dateOrdered': dateOrdered.toIso8601String(),
       'status': status,
+      'batchId': batchId,
     };
   }
 
@@ -42,6 +45,7 @@ class Order {
       quantity: map['quantity'],
       dateOrdered: DateTime.parse(map['dateOrdered']),
       status: map['status'],
+      batchId: map['batchId'],
     );
   }
 }

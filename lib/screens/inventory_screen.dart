@@ -7,7 +7,9 @@ import 'add_inventory_item_screen.dart';
 import 'dart:async';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  const InventoryScreen({super.key, this.initialBranch});
+
+  final Branch? initialBranch;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -57,8 +59,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
               _inventoryItems = [];
               _filteredItems = [];
             }
+          } else if (widget.initialBranch != null) {
+            // Set initial branch if provided
+            try {
+              final initialBranch = branches.firstWhere((branch) => branch.id == widget.initialBranch!.id);
+              _selectedBranch = initialBranch;
+            } catch (e) {
+              // Initial branch not found
+            }
           }
           _isLoading = false;
+          // Load items if branch is selected
+          if (_selectedBranch != null) {
+            _loadInventoryItems();
+          }
         });
       }
     } catch (e) {

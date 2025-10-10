@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:warehouse_inventory/database/database_helper.dart';
+import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/screens/inventory_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -8,83 +12,136 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int totalItems = 1245;
-  int lowStockItems = 28;
-  int totalBranches = 5;
-  int totalCategories = 12;
-  bool isLoading = false;
+  List<Branch> _branches = [];
+  Branch? _selectedBranch;
+  int _totalItems = 0;
+  int _lowStockItems = 0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Using demo data for now
+    _loadBranches();
+  }
+
+  Future<void> _loadBranches() async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final branches = await DatabaseHelper.instance.getAllBranches();
+      setState(() {
+        _branches = branches;
+        if (_branches.isNotEmpty) {
+          _selectedBranch = _branches.first;
+          _loadDataForBranch(_selectedBranch!);
+        } else {
+          _isLoading = false;
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error
+    }
+  }
+
+  Future<void> _loadDataForBranch(Branch branch) async {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
+      int total = items.length;
+      int lowStock = items.where((item) => item.end <= 10).length;
+      setState(() {
+        _totalItems = total;
+        _lowStockItems = lowStock;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
-    final crossAxisCount = isSmallScreen ? 1 : 2;
-    final childAspectRatio = isSmallScreen ? 3.0 : 1.8; // Increased for better fit
     
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
         automaticallyImplyLeading: false,
         titleSpacing: isSmallScreen ? 0.0 : 16.0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
       ),
-      body: isLoading
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 8.0 : 16.0), // Reduced padding
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Warehouse Overview',
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 16.0 : 22.0, // Reduced font size
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      child: DropdownButton<Branch>(
+                        value: _selectedBranch,
+                        hint: const Text('Select Branch'),
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: _branches.map((Branch branch) {
+                          return DropdownMenuItem<Branch>(
+                            value: branch,
+                            child: Text('${branch.name} (${branch.location})'),
+                          );
+                        }).toList(),
+                        onChanged: (Branch? newBranch) {
+                          if (newBranch != null) {
+                            setState(() {
+                              _selectedBranch = newBranch;
+                            });
+                            _loadDataForBranch(newBranch);
+                          }
+                        },
                       ),
                     ),
-                    SizedBox(height: isSmallScreen ? 4.0 : 12.0), // Reduced spacing
+                    const SizedBox(height: 24.0),
                     Expanded(
-                      child: GridView.count(
-                        crossAxisCount: crossAxisCount,
-                        childAspectRatio: childAspectRatio,
-                        crossAxisSpacing: isSmallScreen ? 6.0 : 12.0, // Reduced spacing
-                        mainAxisSpacing: isSmallScreen ? 6.0 : 12.0, // Reduced spacing
-                        children: [
-                          _buildDashboardCard(
-                            context,
-                            'Total Items',
-                            totalItems.toString(),
-                            Icons.inventory,
-                            Colors.blue,
-                          ),
-                          _buildDashboardCard(
-                            context,
-                            'Low Stock Items',
-                            lowStockItems.toString(),
-                            Icons.warning,
-                            Colors.orange,
-                          ),
-                          _buildDashboardCard(
-                            context,
-                            'Total Branches',
-                            totalBranches.toString(),
-                            Icons.store,
-                            Colors.green,
-                          ),
-                          _buildDashboardCard(
-                            context,
-                            'Total Categories',
-                            totalCategories.toString(),
-                            Icons.category,
-                            Colors.purple,
-                          ),
-                        ],
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildInfoCard(
+                              'Total Items',
+                              _totalItems.toString(),
+                              Icons.inventory,
+                              Colors.blue.shade400,
+                            ),
+                            const SizedBox(width: 16.0),
+                            _buildInfoCard(
+                              'Low Stock Items',
+                              _lowStockItems.toString(),
+                              Icons.warning,
+                              Colors.orange.shade400,
+                              () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -94,56 +151,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildDashboardCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 600;
-    
-    return Card(
+  Widget _buildInfoCard(String title, String value, IconData icon, Color color, [VoidCallback? onTap]) {
+    final card = Card(
       elevation: 4.0,
-      child: InkWell(
-        onTap: () {},
-        child: Padding(
-          padding: const EdgeInsets.all(12.0), // Reduced padding
-          child: Column(
-            mainAxisSize: MainAxisSize.min, // Prevent overflow
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 32.0, // Further reduced icon size
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.0),
+      ),
+      child: Container(
+        width: 150,
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 40,
+              color: color,
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4.0),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
                 color: color,
               ),
-              const SizedBox(height: 8.0), // Reduced spacing
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis, // Handle text overflow
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 12.0 : 13.0, // Further reduced font size
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4.0), // Reduced spacing
-              Text(
-                value,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: isSmallScreen ? 16.0 : 18.0, // Further reduced font size
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
+
+    if (onTap != null) {
+      return GestureDetector(
+        onTap: onTap,
+        child: card,
+      );
+    } else {
+      return card;
+    }
   }
+
 }

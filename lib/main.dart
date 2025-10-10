@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:logging/logging.dart';
 import 'theme_notifier.dart';
 import 'providers/order_provider.dart';
 import 'screens/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
+  });
   runApp(
     MultiProvider(
       providers: [

@@ -23,7 +23,6 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
     _loadBranches();
   }
 
-
   Future<void> _loadBranches() async {
     setState(() {
       _isLoading = true;
@@ -31,7 +30,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
 
     try {
       final branches = await DatabaseHelper.instance.getAllBranches();
-      
+
       if (mounted) {
         setState(() {
           _branches = branches;
@@ -44,7 +43,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
         setState(() {
           _isLoading = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error loading branches: ${e.toString()}'),
@@ -58,97 +57,325 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Master Data'),
-        automaticallyImplyLeading: false,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                buildFilterWidget(
-                  filterOptions: const [
-                    DropdownMenuItem(value: 'name', child: Text('Name')),
-                    DropdownMenuItem(value: 'location', child: Text('Location')),
-                    DropdownMenuItem(value: 'code', child: Text('Code')),
-                  ],
-                  onFilterApplied: (filterType, filterValue) {
-                    setState(() {
-                      _filteredBranches = _branches.where((branch) {
-                        switch (filterType) {
-                          case 'name':
-                            return branch.name.toLowerCase().contains(filterValue.toLowerCase());
-                          case 'location':
-                            return branch.location.toLowerCase().contains(filterValue.toLowerCase());
-                          case 'code':
-                            return branch.code?.toLowerCase().contains(filterValue.toLowerCase()) ?? false;
-                          default:
-                            return true;
-                        }
-                      }).toList();
-                    });
-                  },
-                  onReset: () {
-                    setState(() {
-                      _filteredBranches = List.from(_branches);
-                    });
-                  },
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Background bubbles
+            Positioned(
+              top: 100,
+              left: 50,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
                 ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _loadBranches,
-                    child: _filteredBranches.isEmpty
-                        ? const Center(
-                            child: Text('No branches found'),
-                          )
-                        : ListView.builder(
-                            itemCount: _filteredBranches.length,
-                            itemBuilder: (context, index) {
-                              final branch = _filteredBranches[index];
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                  vertical: 8.0,
+              ),
+            ),
+            Positioned(
+              top: 200,
+              right: 80,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.15),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 150,
+              left: 100,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 250,
+              right: 50,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.12),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Master Data',
+                            style: TextStyle(
+                              fontSize: 28.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 10.0,
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(2, 2),
                                 ),
-                                child: ListTile(
-                                  title: Text(
-                                    branch.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF0651A4),
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(16.0),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF0651A4),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(30),
+                                      topRight: Radius.circular(30),
                                     ),
                                   ),
-                                  subtitle: Text(
-                                    'Location: ${branch.location}${branch.code != null && branch.code!.isNotEmpty ? ', Code: ${branch.code}' : ''}',
-                                  ),
-                                  onTap: () async {
-                                    final updated = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            EditBranchScreen(branch: branch),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.business,
+                                        color: Colors.white,
+                                        size: 28,
                                       ),
-                                    );
-                                    if (updated == true) {
-                                      _loadBranches();
-                                    }
-                                  },
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Branches',
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      ElevatedButton.icon(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const AddBranchScreen(),
+                                            ),
+                                          ).then((_) => _loadBranches());
+                                        },
+                                        icon: const Icon(Icons.add),
+                                        label: const Text('Add Branch'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: Color(0xFF0651A4),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          elevation: 4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
+                                Container(
+                                  margin: const EdgeInsets.all(16.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: buildFilterWidget(
+                                    filterOptions: const [
+                                      DropdownMenuItem(
+                                        value: 'name',
+                                        child: Text('Name'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'location',
+                                        child: Text('Location'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'code',
+                                        child: Text('Code'),
+                                      ),
+                                    ],
+                                    onFilterApplied: (filterType, filterValue) {
+                                      setState(() {
+                                        _filteredBranches = _branches.where((
+                                          branch,
+                                        ) {
+                                          switch (filterType) {
+                                            case 'name':
+                                              return branch.name
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
+                                            case 'location':
+                                              return branch.location
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
+                                            case 'code':
+                                              return branch.code
+                                                      ?.toLowerCase()
+                                                      .contains(
+                                                        filterValue
+                                                            .toLowerCase(),
+                                                      ) ??
+                                                  false;
+                                            default:
+                                              return true;
+                                          }
+                                        }).toList();
+                                      });
+                                    },
+                                    onReset: () {
+                                      setState(() {
+                                        _filteredBranches = List.from(
+                                          _branches,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: RefreshIndicator(
+                                    onRefresh: _loadBranches,
+                                    child: _filteredBranches.isEmpty
+                                        ? const Center(
+                                            child: Text('No branches found'),
+                                          )
+                                        : ListView.builder(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16.0,
+                                            ),
+                                            itemCount: _filteredBranches.length,
+                                            itemBuilder: (context, index) {
+                                              final branch =
+                                                  _filteredBranches[index];
+                                              return Card(
+                                                margin: const EdgeInsets.only(
+                                                  bottom: 12.0,
+                                                ),
+                                                elevation: 6,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                color: Colors.white,
+                                                shadowColor: const Color(
+                                                  0xFF0651A4,
+                                                ).withOpacity(0.2),
+                                                child: ListTile(
+                                                  leading: CircleAvatar(
+                                                    backgroundColor:
+                                                        const Color(
+                                                          0xFF0651A4,
+                                                        ).withOpacity(0.1),
+                                                    child: const Icon(
+                                                      Icons.business,
+                                                      color: Color(0xFF0651A4),
+                                                    ),
+                                                  ),
+                                                  title: Text(
+                                                    branch.name,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color(0xFF0651A4),
+                                                    ),
+                                                  ),
+                                                  subtitle: Text(
+                                                    'Location: ${branch.location}${branch.code != null && branch.code!.isNotEmpty ? '\nCode: ${branch.code}' : ''}',
+                                                    style: const TextStyle(
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  onTap: () async {
+                                                    final updated =
+                                                        await Navigator.push(
+                                                          context,
+                                                          MaterialPageRoute(
+                                                            builder: (context) =>
+                                                                EditBranchScreen(
+                                                                  branch:
+                                                                      branch,
+                                                                ),
+                                                          ),
+                                                        );
+                                                    if (updated == true) {
+                                                      _loadBranches();
+                                                    }
+                                                  },
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Add new branch
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddBranchScreen()),
-          ).then((_) => _loadBranches()); // Refresh list after adding
-        },
-        child: const Icon(Icons.add),
+          ],
+        ),
       ),
     );
   }

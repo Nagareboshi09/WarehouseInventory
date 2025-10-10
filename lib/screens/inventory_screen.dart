@@ -46,7 +46,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
           // Update selected branch if it exists
           if (_selectedBranch != null) {
             try {
-              final updatedBranch = branches.firstWhere((branch) => branch.id == _selectedBranch!.id);
+              final updatedBranch = branches.firstWhere(
+                (branch) => branch.id == _selectedBranch!.id,
+              );
               _selectedBranch = updatedBranch;
             } catch (e) {
               // Branch not found, might be deleted, so set to null
@@ -82,7 +84,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
 
     try {
-      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(_selectedBranch!.id!);
+      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(
+        _selectedBranch!.id!,
+      );
       if (mounted) {
         setState(() {
           _inventoryItems = items;
@@ -125,7 +129,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _filteredItems = _inventoryItems.where((item) {
           return item.sku.toLowerCase().contains(query.toLowerCase()) ||
               item.description.toLowerCase().contains(query.toLowerCase()) ||
-              
               (item.brand?.toLowerCase() ?? '').contains(query.toLowerCase());
         }).toList();
       }
@@ -133,7 +136,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
-    final TextEditingController quantityController = TextEditingController(text: item.end.toString());
+    final TextEditingController quantityController = TextEditingController(
+      text: item.end.toString(),
+    );
     bool isLoading = false;
 
     await showDialog(
@@ -141,103 +146,312 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Update Quantity'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('SKU: ${item.sku}'),
-                  const SizedBox(height: 8),
-                  Text('Description: ${item.description}'),
-                  const SizedBox(height: 8),
-                  
-                  const SizedBox(height: 8),
-                  Text('Brand: ${item.brand}'),
-                  const SizedBox(height: 8),
-                  Text('Location: ${item.location}'),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: quantityController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'New Quantity',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
               ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading ? null : () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+              backgroundColor: Colors.white,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                ElevatedButton(
-                  onPressed: isLoading ? null : () async {
-                    setDialogState(() {
-                      isLoading = true;
-                    });
-
-                    final newQuantity = int.tryParse(quantityController.text.trim());
-                    if (newQuantity != null && newQuantity >= 0) {
-                      try {
-                        final updatedItem = InventoryItem(
-                          id: item.id,
-                          sku: item.sku,
-                          
-                          description: item.description,
-                          end: newQuantity,
-                          location: item.location,
-                          brand: item.brand,
-                          dateAdded: item.dateAdded,
-                          branchId: item.branchId,
-                        );
-
-                        await DatabaseHelper.instance.updateInventoryItem(updatedItem);
-
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Quantity updated successfully!'),
-                              backgroundColor: Colors.green,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0651A4),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit, color: Colors.white, size: 28),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Update Quantity',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          );
-                          Navigator.of(context).pop();
-                          _loadInventoryItems(); // Refresh the list
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error updating quantity: ${e.toString()}'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    } else {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter a valid quantity'),
-                            backgroundColor: Colors.red,
                           ),
-                        );
-                      }
-                    }
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0651A4).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.qr_code,
+                                color: Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'SKU: ${item.sku}',
+                                style: const TextStyle(
+                                  color: Color(0xFF0651A4),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.description,
+                                color: Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Description: ${item.description}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF0651A4),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.branding_watermark,
+                                color: Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Brand: ${item.brand}',
+                                style: const TextStyle(
+                                  color: Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on,
+                                color: Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Location: ${item.location}',
+                                style: const TextStyle(
+                                  color: Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF0651A4).withOpacity(0.3),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: quantityController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'New Quantity',
+                          labelStyle: const TextStyle(color: Color(0xFF0651A4)),
+                          hintText: 'Enter quantity',
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.numbers,
+                            color: Color(0xFF0651A4),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: isLoading
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.grey,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isLoading
+                                ? null
+                                : () async {
+                                    setDialogState(() {
+                                      isLoading = true;
+                                    });
 
-                    setDialogState(() {
-                      isLoading = false;
-                    });
-                  },
-                  child: isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                        )
-                      : const Text('Update'),
+                                    final newQuantity = int.tryParse(
+                                      quantityController.text.trim(),
+                                    );
+                                    if (newQuantity != null &&
+                                        newQuantity >= 0) {
+                                      try {
+                                        final updatedItem = InventoryItem(
+                                          id: item.id,
+                                          sku: item.sku,
+                                          description: item.description,
+                                          end: newQuantity,
+                                          location: item.location,
+                                          brand: item.brand,
+                                          dateAdded: item.dateAdded,
+                                          branchId: item.branchId,
+                                        );
+
+                                        await DatabaseHelper.instance
+                                            .updateInventoryItem(updatedItem);
+
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: const Text(
+                                                'Quantity updated successfully!',
+                                              ),
+                                              backgroundColor: Colors.green,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                          Navigator.of(context).pop();
+                                          _loadInventoryItems(); // Refresh the list
+                                        }
+                                      } catch (e) {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Error updating quantity: ${e.toString()}',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(15),
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } else {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: const Text(
+                                              'Please enter a valid quantity',
+                                            ),
+                                            backgroundColor: Colors.red,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                            ),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    }
+
+                                    setDialogState(() {
+                                      isLoading = false;
+                                    });
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0651A4),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 4,
+                              shadowColor: const Color(
+                                0xFF0651A4,
+                              ).withOpacity(0.3),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    'Update',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
           },
         );
@@ -246,43 +460,50 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildBranchSelectionView() {
-    return Center(
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.location_on,
-            size: 80,
-            color: Colors.grey,
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0651A4).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(
+              Icons.location_on,
+              size: 60,
+              color: Color(0xFF0651A4),
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           const Text(
             'Select a Branch',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
+              color: Color(0xFF0651A4),
             ),
           ),
           const SizedBox(height: 8),
           const Text(
             'Please select a branch to view inventory items',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color.fromARGB(255, 107, 104, 104),
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.black87),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
           if (_branches.isNotEmpty) ..._getBranchSelectionWidgets(),
           if (_branches.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 16),
-              child: Text(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Text(
                 'No branches available',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.red, fontSize: 16),
               ),
             ),
         ],
@@ -293,110 +514,386 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_branchSelected ? '${_selectedBranch?.name} Inventory' : 'Warehouse Inventory'),
-        leading: _branchSelected
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _resetBranchSelection,
-              )
-            : null,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : !_branchSelected
-              ? _buildBranchSelectionView()
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Search Inventory',
-                          hintText: 'Search by SKU or name',
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _filterItems('');
-                                    FocusScope.of(context).unfocus();
-                                  },
-                                )
-                              : null,
-                        ),
-                        onChanged: _filterItems,
-                      ),
-                    ),
-                    buildFilterWidget(
-                      filterOptions: const [
-                        DropdownMenuItem(value: 'name', child: Text('Name / Description')),
-                        DropdownMenuItem(value: 'date', child: Text('Date Created')),
-                        DropdownMenuItem(value: 'sku', child: Text('SKU')),
-                        DropdownMenuItem(value: 'branch', child: Text('Branch')),
-                      ],
-                      onFilterApplied: (filterType, filterValue) {
-                        setState(() {
-                          _filteredItems = _inventoryItems.where((item) {
-                            switch (filterType) {
-                              case 'sku':
-                                return item.sku.toLowerCase().contains(filterValue.toLowerCase());
-                              case 'name':
-                                return item.description.toLowerCase().contains(filterValue.toLowerCase());
-                              case 'date':
-                                final formattedDate = '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
-                                return formattedDate.contains(filterValue) || item.dateAdded.toIso8601String().contains(filterValue);
-                              case 'branch':
-                                return _selectedBranch?.name.toLowerCase().contains(filterValue.toLowerCase()) ?? false;
-                              default:
-                                return true;
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Background bubbles
+            Positioned(
+              top: 100,
+              left: 50,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 200,
+              right: 80,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.15),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 150,
+              left: 100,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 250,
+              right: 50,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.12),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (_branchSelected) {
+                              _resetBranchSelection();
+                            } else if (Navigator.canPop(context)) {
+                              Navigator.of(context).pop();
                             }
-                          }).toList();
-                        });
-                      },
-                      onReset: () {
-                        setState(() {
-                          _filteredItems = List.from(_inventoryItems);
-                        });
-                      },
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            _branchSelected
+                                ? '${_selectedBranch?.name} Inventory'
+                                : 'Warehouse Inventory',
+                            style: TextStyle(
+                              fontSize: 28.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 10.0,
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      child: _filteredItems.isEmpty
-                          ? const Center(child: Text('No inventory items found'))
-                          : RefreshIndicator(
-                              onRefresh: _loadInventoryItems,
-                              child: ListView.builder(
-                                itemCount: _filteredItems.length,
-                                itemBuilder: (context, index) {
-                                  final item = _filteredItems[index];
-                                  return Card(
-                                    margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                                    child: ListTile(
-                                      onTap: () => _showQuantityUpdateDialog(item),
-                                      title: Text(item.description, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      subtitle: Text(
-                                        'SKU: ${item.sku} | Brand: ${item.brand}',
+                  ),
+                  Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.95),
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Color(0xFF0651A4),
+                              ),
+                            )
+                          : !_branchSelected
+                          ? _buildBranchSelectionView()
+                          : Column(
+                              children: [
+                                Container(
+                                  margin: const EdgeInsets.all(16.0),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0651A4),
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(20),
+                                      topRight: Radius.circular(20),
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.inventory,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            '${_selectedBranch?.name} Inventory',
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 16.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: TextField(
+                                    decoration: InputDecoration(
+                                      labelText: 'Search Inventory',
+                                      labelStyle: const TextStyle(
+                                        color: Color(0xFF0651A4),
                                       ),
-                                      trailing: Text(
-                                        'Qty: ${item.end}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: item.end <= 10 ? Colors.red : Colors.green,
+                                      hintText: 'Search by SKU or name',
+                                      prefixIcon: const Icon(
+                                        Icons.search,
+                                        color: Color(0xFF0651A4),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF0651A4),
                                         ),
                                       ),
-                                      isThreeLine: false,
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF0651A4),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
                                     ),
-                                  );
-                                },
-                              ),
+                                    onChanged: _filterItems,
+                                  ),
+                                ),
+                                Container(
+                                  margin: const EdgeInsets.all(16.0),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: buildFilterWidget(
+                                    filterOptions: const [
+                                      DropdownMenuItem(
+                                        value: 'name',
+                                        child: Text('Name / Description'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'date',
+                                        child: Text('Date Created'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'sku',
+                                        child: Text('SKU'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'branch',
+                                        child: Text('Branch'),
+                                      ),
+                                    ],
+                                    onFilterApplied: (filterType, filterValue) {
+                                      setState(() {
+                                        _filteredItems = _inventoryItems.where((
+                                          item,
+                                        ) {
+                                          switch (filterType) {
+                                            case 'sku':
+                                              return item.sku
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
+                                            case 'name':
+                                              return item.description
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
+                                            case 'date':
+                                              final formattedDate =
+                                                  '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+                                              return formattedDate.contains(
+                                                    filterValue,
+                                                  ) ||
+                                                  item.dateAdded
+                                                      .toIso8601String()
+                                                      .contains(filterValue);
+                                            case 'branch':
+                                              return _selectedBranch?.name
+                                                      .toLowerCase()
+                                                      .contains(
+                                                        filterValue
+                                                            .toLowerCase(),
+                                                      ) ??
+                                                  false;
+                                            default:
+                                              return true;
+                                          }
+                                        }).toList();
+                                      });
+                                    },
+                                    onReset: () {
+                                      setState(() {
+                                        _filteredItems = List.from(
+                                          _inventoryItems,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _filteredItems.isEmpty
+                                      ? const Center(
+                                          child: Text(
+                                            'No inventory items found',
+                                          ),
+                                        )
+                                      : RefreshIndicator(
+                                          onRefresh: _loadInventoryItems,
+                                          child: ListView.builder(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16.0,
+                                            ),
+                                            itemCount: _filteredItems.length,
+                                            itemBuilder: (context, index) {
+                                              final item =
+                                                  _filteredItems[index];
+                                              return Card(
+                                                margin: const EdgeInsets.only(
+                                                  bottom: 12.0,
+                                                ),
+                                                elevation: 6,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                color: Colors.white,
+                                                shadowColor: const Color(
+                                                  0xFF0651A4,
+                                                ).withOpacity(0.2),
+                                                child: ListTile(
+                                                  leading: CircleAvatar(
+                                                    backgroundColor:
+                                                        const Color(
+                                                          0xFF0651A4,
+                                                        ).withOpacity(0.1),
+                                                    child: const Icon(
+                                                      Icons.inventory,
+                                                      color: Color(0xFF0651A4),
+                                                    ),
+                                                  ),
+                                                  onTap: () =>
+                                                      _showQuantityUpdateDialog(
+                                                        item,
+                                                      ),
+                                                  title: Text(
+                                                    item.description,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Color(0xFF0651A4),
+                                                    ),
+                                                  ),
+                                                  subtitle: Text(
+                                                    'SKU: ${item.sku} | Brand: ${item.brand}',
+                                                    style: const TextStyle(
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  trailing: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: item.end <= 10
+                                                          ? Colors.red
+                                                                .withOpacity(
+                                                                  0.1,
+                                                                )
+                                                          : Colors.green
+                                                                .withOpacity(
+                                                                  0.1,
+                                                                ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            15,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      'Qty: ${item.end}',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: item.end <= 10
+                                                            ? Colors.red
+                                                            : Colors.green,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  isThreeLine: false,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                ),
+                              ],
                             ),
                     ),
-                  ],
-                ),
-      floatingActionButton: null,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -408,31 +905,36 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   List<Widget> _getBranchSelectionWidgets() {
     List<Branch> filteredBranches = _branches.where((branch) {
-      return branch.name.toLowerCase().contains(_branchSearchQuery.toLowerCase()) ||
-          branch.location.toLowerCase().contains(_branchSearchQuery.toLowerCase());
+      return branch.name.toLowerCase().contains(
+            _branchSearchQuery.toLowerCase(),
+          ) ||
+          branch.location.toLowerCase().contains(
+            _branchSearchQuery.toLowerCase(),
+          );
     }).toList();
     return [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+      Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: TextField(
           decoration: InputDecoration(
             labelText: 'Search Branches',
+            labelStyle: const TextStyle(color: Color(0xFF0651A4)),
             hintText: 'Search by name or location',
-            prefixIcon: const Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search, color: Color(0xFF0651A4)),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(color: Color(0xFF0651A4)),
             ),
-            suffixIcon: _branchSearchQuery.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      setState(() {
-                        _branchSearchQuery = '';
-                      });
-                      FocusScope.of(context).unfocus();
-                    },
-                  )
-                : null,
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: const BorderSide(color: Color(0xFF0651A4), width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
           ),
           onChanged: (value) {
             setState(() {
@@ -443,16 +945,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       if (_branchSearchQuery.isNotEmpty && filteredBranches.isNotEmpty)
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 32),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF0651A4).withOpacity(0.3)),
+            borderRadius: BorderRadius.circular(20),
             color: Colors.white,
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Colors.black26,
-                blurRadius: 4,
-                offset: Offset(0, 2),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
@@ -462,7 +964,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
             itemBuilder: (context, index) {
               final branch = filteredBranches[index];
               return ListTile(
-                title: Text('${branch.name} (${branch.location})'),
+                leading: const Icon(Icons.business, color: Color(0xFF0651A4)),
+                title: Text(
+                  '${branch.name} (${branch.location})',
+                  style: const TextStyle(color: Color(0xFF0651A4)),
+                ),
                 onTap: () {
                   setState(() {
                     _selectedBranch = branch;
@@ -476,18 +982,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       const SizedBox(height: 16),
       Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          borderRadius: BorderRadius.circular(8),
-          color: const Color.fromARGB(255, 94, 84, 84),
+          border: Border.all(color: const Color(0xFF0651A4).withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(20),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: DropdownButton<Branch>(
           value: _selectedBranch,
           isExpanded: true,
-          hint: const Text('Select a branch'),
+          hint: const Text(
+            'Select a branch',
+            style: TextStyle(color: Color(0xFF0651A4)),
+          ),
           underline: Container(),
+          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0651A4)),
           items: _branches.map((Branch branch) {
             return DropdownMenuItem<Branch>(
               value: branch,
@@ -496,6 +1013,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
+                  color: Color(0xFF0651A4),
                 ),
               ),
             );

@@ -6,10 +6,7 @@ import 'package:warehouse_inventory/screens/edit_master_item_screen.dart';
 class EditBranchScreen extends StatefulWidget {
   final Branch branch;
 
-  const EditBranchScreen({
-    super.key,
-    required this.branch,
-  });
+  const EditBranchScreen({super.key, required this.branch});
 
   @override
   State<EditBranchScreen> createState() => _EditBranchScreenState();
@@ -42,7 +39,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
         id: widget.branch.id,
         name: _nameController.text.trim(),
         location: _locationController.text.trim(),
-        code: _codeController.text.trim().isEmpty ? null : _codeController.text.trim(),
+        code: _codeController.text.trim().isEmpty
+            ? null
+            : _codeController.text.trim(),
       );
 
       await DatabaseHelper.instance.updateBranch(updatedBranch);
@@ -79,7 +78,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Branch'),
-        content: const Text('Are you sure you want to delete this branch? This will also delete all associated master items and inventory items.'),
+        content: const Text(
+          'Are you sure you want to delete this branch? This will also delete all associated master items and inventory items.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -143,77 +144,289 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     final isSmallScreen = screenWidth < 600;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Branch'),
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Branch Name',
-                  prefixIcon: Icon(Icons.store),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a branch name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location',
-                  prefixIcon: Icon(Icons.location_on),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a location';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _codeController,
-                decoration: const InputDecoration(
-                  labelText: 'Code',
-                  prefixIcon: Icon(Icons.code),
-                  border: OutlineInputBorder(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Background bubbles
+            Positioned(
+              top: 100,
+              left: 50,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
                 ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.manage_search),
-                label: const Text('Edit Master Items for this Branch'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueGrey,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            Positioned(
+              top: 200,
+              right: 80,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.15),
                 ),
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditMasterItemScreen(
-                              branch: widget.branch,
+              ),
+            ),
+            Positioned(
+              bottom: 150,
+              left: 100,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 250,
+              right: 50,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.12),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            'Edit Branch',
+                            style: TextStyle(
+                              fontSize: 28.0,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 10.0,
+                                  color: Colors.black.withOpacity(0.3),
+                                  offset: const Offset(2, 2),
+                                ),
+                              ],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF0651A4,
+                                        ).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _nameController,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Branch Name',
+                                        labelStyle: const TextStyle(
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.store,
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                      validator: (value) {
+                                        if (value == null ||
+                                            value.trim().isEmpty) {
+                                          return 'Please enter a branch name';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF0651A4,
+                                        ).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _locationController,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Location',
+                                        labelStyle: const TextStyle(
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.location_on,
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                      validator: (value) {
+                                        if (value == null ||
+                                            value.trim().isEmpty) {
+                                          return 'Please enter a location';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF0651A4,
+                                        ).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _codeController,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Code',
+                                        labelStyle: const TextStyle(
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: const Icon(
+                                          Icons.code,
+                                          color: Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.manage_search),
+                                    label: const Text(
+                                      'Edit Master Items for this Branch',
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0651A4),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                        horizontal: 20,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 4,
+                                      shadowColor: const Color(
+                                        0xFF0651A4,
+                                      ).withOpacity(0.3),
+                                    ),
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    EditMasterItemScreen(
+                                                      branch: widget.branch,
+                                                    ),
+                                              ),
+                                            );
+                                          },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: Row(
@@ -224,12 +437,15 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
             onPressed: _isLoading ? null : _deleteBranch,
             heroTag: 'delete',
             backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
             child: const Icon(Icons.delete),
           ),
           const SizedBox(width: 16),
           FloatingActionButton(
             onPressed: _isLoading ? null : _updateBranch,
             heroTag: 'save',
+            backgroundColor: const Color(0xFF0651A4),
+            foregroundColor: Colors.white,
             child: _isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
                 : const Icon(Icons.save),

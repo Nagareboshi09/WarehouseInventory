@@ -52,6 +52,9 @@ dependencies:
   # Charts for dashboard
   fl_chart: ^0.66.0
 
+  # Logging framework
+  logging: ^1.2.0
+
   # File picker for selecting files
   file_picker: ^8.0.0+1
 

@@ -7,6 +7,7 @@ import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:logging/logging.dart';
 
 class AddBranchScreen extends StatefulWidget {
   const AddBranchScreen({super.key});
@@ -28,6 +29,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   bool _addingItem = false;
   final List<MasterItem> _masterItems = [];
   final List<int> _masterItemQuantities = [];
+  final _logger = Logger('AddBranchScreen');
 
   void _addMasterItem() {
     if (_skuController.text.trim().isEmpty ||
@@ -124,11 +126,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           raw = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
           final firstLine = raw.split('\n').isNotEmpty ? raw.split('\n').first : '';
           final delimiter = firstLine.contains(';') ? ';' : ',';
-          print('DEBUG: CSV first line: "$firstLine"');
-          print('DEBUG: Detected delimiter: "$delimiter"');
+          _logger.fine('CSV first line: "$firstLine"');
+          _logger.fine('Detected delimiter: "$delimiter"');
           final converter = CsvToListConverter(fieldDelimiter: delimiter, eol: '\n');
           rows = converter.convert(raw);
-          print('DEBUG: Parsed ${rows.length} rows from CSV');
+          _logger.fine('Parsed ${rows.length} rows from CSV');
         } else if (ext == 'xlsx') {
           final bytes = file.readAsBytesSync();
           final decoder = SpreadsheetDecoder.decodeBytes(bytes);
@@ -193,12 +195,33 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
         final headerRow = rows[0];
         Map<String, int> headerMap = {};
+        Map<String, List<int>> duplicateHeaders = {}; // Track all occurrences
 
+        _logger.fine('Processing header row with ${headerRow.length} columns:');
         for (var i = 0; i < headerRow.length; i++) {
           final rawHeader = cellText(headerRow[i]);
           final key = normalizeHeader(rawHeader);
+          final columnLetter = String.fromCharCode(65 + i); // A, B, C, etc.
+          _logger.fine('Column $columnLetter (index $i): raw="$rawHeader", normalized="$key"');
           if (key.isNotEmpty) {
-            headerMap[key] = i;
+            // Track all occurrences of each header
+            if (!duplicateHeaders.containsKey(key)) {
+              duplicateHeaders[key] = [];
+            }
+            duplicateHeaders[key]!.add(i);
+
+            // Use the leftmost (earliest) occurrence
+            if (!headerMap.containsKey(key)) {
+              headerMap[key] = i;
+            }
+          }
+        }
+
+        // Warn about duplicate headers
+        for (final entry in duplicateHeaders.entries) {
+          if (entry.value.length > 1) {
+            final columns = entry.value.map((idx) => String.fromCharCode(65 + idx)).join(', ');
+            _logger.warning('Header "${entry.key}" found in multiple columns: $columns. Using leftmost: ${String.fromCharCode(65 + entry.value.first)}');
           }
         }
 
@@ -215,9 +238,13 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             headerMap['qty'] ??
             headerMap['stock'];
 
-        // Debug: Show detected headers
-        print('DEBUG: Detected headers: $headerMap');
-        print('DEBUG: skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
+        // Debug: Show detected headers and raw header row
+        _logger.fine('Raw header row: ${headerRow.map(cellText).toList()}');
+        _logger.fine('Detected headers: $headerMap');
+        _logger.fine('skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
+        _logger.fine('Column mappings - SKU: ${skuIndex != null ? 'Column ${String.fromCharCode(65 + skuIndex)}' : 'Not found'}');
+        _logger.fine('Column mappings - Description: ${descriptionIndex != null ? 'Column ${String.fromCharCode(65 + descriptionIndex)}' : 'Not found'}');
+        _logger.fine('Column mappings - Quantity: ${quantityIndex != null ? 'Column ${String.fromCharCode(65 + quantityIndex)}' : 'Not found'}');
 
         if (skuIndex == null || descriptionIndex == null) {
           if (!mounted) return;
@@ -235,10 +262,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
         for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
           final row = rows[rowIndex];
-          print('DEBUG: Processing row $rowIndex: ${row.map(cellText).toList()}');
+          _logger.fine('Processing row $rowIndex: ${row.map(cellText).toList()}');
 
           if (row.length <= skuIndex || row.length <= descriptionIndex) {
-            print('DEBUG: Skipping row $rowIndex - insufficient columns');
+            _logger.fine('Skipping row $rowIndex - insufficient columns');
             continue;
           }
 
@@ -252,11 +279,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               : '';
           final qty = qtyStr.isEmpty ? null : num.tryParse(qtyStr)?.round();
 
-          print('DEBUG: Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
+          _logger.fine('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
 
           // Skip section headers like "Bronco" rows without SKU or empty description
           if (sku.isEmpty || description.isEmpty) {
-            print('DEBUG: Skipping row $rowIndex - empty SKU or description');
+            _logger.fine('Skipping row $rowIndex - empty SKU or description');
             continue;
           }
 
@@ -267,12 +294,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             final words = description.split(' ');
             if (words.isNotEmpty) {
               finalBrand = words.first.trim();
-              print('DEBUG: Auto-extracted brand "$finalBrand" from description');
+              _logger.fine('Auto-extracted brand "$finalBrand" from description');
             }
           }
 
           // Allow items with null or any numeric quantity (including 0)
-          print('DEBUG: Adding item from row $rowIndex');
+          _logger.fine('Adding item from row $rowIndex');
 
           final masterItem = MasterItem(
             sku: sku,
@@ -286,7 +313,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           importedQuantities.add(qty ?? 0); // Use 0 as default for the list, but preserve null for DB
         }
 
-        print('DEBUG: Total items processed: ${rows.length - 1}, valid items found: ${importedItems.length}');
+        _logger.fine('Total items processed: ${rows.length - 1}, valid items found: ${importedItems.length}');
 
         if (importedItems.isEmpty) {
           if (!mounted) return;

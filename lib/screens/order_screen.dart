@@ -186,16 +186,19 @@ class _OrderScreenState extends State<OrderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -209,7 +212,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -221,7 +224,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -233,7 +236,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -245,7 +248,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -265,9 +268,9 @@ class _OrderScreenState extends State<OrderScreen> {
                               ),
                             );
                           },
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back,
-                            color: Colors.white,
+                            color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -301,11 +304,11 @@ class _OrderScreenState extends State<OrderScreen> {
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.95),
+                                color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                                     blurRadius: 10,
                                     offset: const Offset(0, 5),
                                   ),
@@ -319,7 +322,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF0651A4),
+                                        color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
@@ -347,24 +350,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                     // Branch Dropdown
                                     Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.grey.shade50,
+                                        color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: const Color(
-                                            0xFF0651A4,
-                                          ).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                         ),
                                       ),
                                       child: DropdownButtonFormField<Branch>(
                                         value: _selectedBranch,
                                         decoration: InputDecoration(
                                           labelText: 'Branch *',
-                                          labelStyle: const TextStyle(
-                                            color: Color(0xFF0651A4),
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           ),
-                                          prefixIcon: const Icon(
+                                          prefixIcon: Icon(
                                             Icons.store,
-                                            color: Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           ),
                                           border: InputBorder.none,
                                           contentPadding:
@@ -379,8 +380,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                             value: branch,
                                             child: Text(
                                               branch.name,
-                                              style: const TextStyle(
-                                                color: Color(0xFF0651A4),
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                               ),
                                             ),
                                           );
@@ -405,24 +406,22 @@ class _OrderScreenState extends State<OrderScreen> {
                                     // Location TextField
                                     Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.grey.shade50,
+                                        color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: const Color(
-                                            0xFF0651A4,
-                                          ).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                         ),
                                       ),
                                       child: TextFormField(
                                         controller: _locationController,
                                         decoration: InputDecoration(
                                           labelText: 'Location *',
-                                          labelStyle: const TextStyle(
-                                            color: Color(0xFF0651A4),
+                                          labelStyle: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           ),
-                                          prefixIcon: const Icon(
+                                          prefixIcon: Icon(
                                             Icons.location_on,
-                                            color: Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           ),
                                           border: InputBorder.none,
                                           contentPadding:
@@ -444,18 +443,18 @@ class _OrderScreenState extends State<OrderScreen> {
                                     // Items List
                                     if (_selectedBranch != null &&
                                         _masterItems.isNotEmpty) ...[
-                                      const Text(
+                                      Text(
                                         'Select Items to Order',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
                                       const SizedBox(height: 12),
                                       Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade50,
+                                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -463,14 +462,14 @@ class _OrderScreenState extends State<OrderScreen> {
                                         child: TextField(
                                           decoration: InputDecoration(
                                             labelText: 'Search Items',
-                                            labelStyle: const TextStyle(
-                                              color: Color(0xFF0651A4),
+                                            labelStyle: TextStyle(
+                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                             ),
                                             hintText:
                                                 'Search by SKU, name, or brand',
-                                            prefixIcon: const Icon(
+                                            prefixIcon: Icon(
                                               Icons.search,
-                                              color: Color(0xFF0651A4),
+                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                             ),
                                             border: InputBorder.none,
                                             contentPadding:
@@ -487,9 +486,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         height: 300,
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: const Color(
-                                              0xFF0651A4,
-                                            ).withOpacity(0.3),
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                           ),
                                           borderRadius: BorderRadius.circular(
                                             20,
@@ -510,10 +507,10 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 borderRadius:
                                                     BorderRadius.circular(15),
                                               ),
-                                              color: Colors.white,
+                                              color: isDarkMode ? Colors.grey[800] : Colors.white,
                                               shadowColor: const Color(
                                                 0xFF0651A4,
-                                              ).withOpacity(0.2),
+                                              ).withOpacity(isDarkMode ? 0.5 : 0.2),
                                               child: Padding(
                                                 padding: const EdgeInsets.all(
                                                   12,
@@ -524,7 +521,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                       backgroundColor:
                                                           const Color(
                                                             0xFF0651A4,
-                                                          ).withOpacity(0.1),
+                                                          ).withOpacity(isDarkMode ? 0.3 : 0.1),
                                                       child: const Icon(
                                                         Icons.inventory,
                                                         color: Color(
@@ -542,21 +539,17 @@ class _OrderScreenState extends State<OrderScreen> {
                                                           Text(
                                                             item.description,
                                                             style:
-                                                                const TextStyle(
+                                                                TextStyle(
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .bold,
-                                                                  color: Color(
-                                                                    0xFF0651A4,
-                                                                  ),
+                                                                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                                                 ),
                                                           ),
                                                           Text(
                                                             'SKU: ${item.sku} | Brand: ${item.brand ?? 'N/A'}',
                                                             style: TextStyle(
-                                                              color: Colors
-                                                                  .grey
-                                                                  .shade600,
+                                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
                                                               fontSize: 12,
                                                             ),
                                                           ),
@@ -566,16 +559,13 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     Container(
                                                       width: 80,
                                                       decoration: BoxDecoration(
-                                                        color:
-                                                            Colors.grey.shade50,
+                                                        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                                                         borderRadius:
                                                             BorderRadius.circular(
                                                               15,
                                                             ),
                                                         border: Border.all(
-                                                          color: const Color(
-                                                            0xFF0651A4,
-                                                          ).withOpacity(0.3),
+                                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                                         ),
                                                       ),
                                                       child: TextField(
@@ -657,7 +647,7 @@ class _OrderScreenState extends State<OrderScreen> {
                             ElevatedButton.icon(
                               onPressed: _isLoading ? null : _submitOrder,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0651A4),
+                                backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 16,
@@ -668,7 +658,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                 elevation: 6,
                                 shadowColor: const Color(
                                   0xFF0651A4,
-                                ).withOpacity(0.3),
+                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
                               ),
                               icon: _isLoading
                                   ? const SizedBox(

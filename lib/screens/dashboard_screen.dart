@@ -74,12 +74,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 600;
-    
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboards'),
+        title: const Text('Dashboard'),
         automaticallyImplyLeading: false,
         titleSpacing: isSmallScreen ? 0.0 : 16.0,
         backgroundColor: Colors.white,

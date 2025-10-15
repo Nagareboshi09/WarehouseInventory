@@ -79,9 +79,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         automaticallyImplyLeading: false,
-        titleSpacing: isSmallScreen ? 0.0 : 16.0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        titleSpacing: MediaQuery.of(context).size.width < 600 ? 0.0 : 16.0,
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        foregroundColor: isDarkMode ? Colors.white : Colors.black,
         elevation: 0,
       ),
       body: _isLoading
@@ -94,18 +94,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(8.0),
                       ),
                       child: DropdownButton<Branch>(
                         value: _selectedBranch,
-                        hint: const Text('Select Branch'),
+                        hint: Text('Select Branch', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54)),
                         isExpanded: true,
                         underline: const SizedBox(),
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        dropdownColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
                         items: _branches.map((Branch branch) {
                           return DropdownMenuItem<Branch>(
                             value: branch,
-                            child: Text('${branch.name} (${branch.location})'),
+                            child: Text('${branch.name} (${branch.location})', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
                           );
                         }).toList(),
                         onChanged: (Branch? newBranch) {

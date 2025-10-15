@@ -56,13 +56,16 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -76,7 +79,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -88,7 +91,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -100,7 +103,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -112,7 +115,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -129,9 +132,9 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                               Navigator.of(context).pop();
                             }
                           },
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back,
-                            color: Colors.white,
+                            color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -159,11 +162,11 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.95),
+                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -179,8 +182,8 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                               children: [
                                 Container(
                                   padding: const EdgeInsets.all(16.0),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF0651A4),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                     borderRadius: BorderRadius.only(
                                       topLeft: Radius.circular(30),
                                       topRight: Radius.circular(30),
@@ -188,7 +191,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.business,
                                         color: Colors.white,
                                         size: 28,
@@ -217,8 +220,8 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                         icon: const Icon(Icons.add),
                                         label: const Text('Add Branch'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: Color(0xFF0651A4),
+                                          backgroundColor: isDarkMode ? Colors.blue[700] : Colors.white,
+                                          foregroundColor: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               20,
@@ -233,7 +236,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                 Container(
                                   margin: const EdgeInsets.all(16.0),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: buildFilterWidget(
@@ -316,16 +319,16 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                                   borderRadius:
                                                       BorderRadius.circular(20),
                                                 ),
-                                                color: Colors.white,
+                                                color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(0.2),
+                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(0.1),
+                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.business,
                                                       color: Color(0xFF0651A4),
@@ -333,16 +336,16 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                                   ),
                                                   title: Text(
                                                     branch.name,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      color: Color(0xFF0651A4),
+                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                                     ),
                                                   ),
                                                   subtitle: Text(
                                                     'Location: ${branch.location}${branch.code != null && branch.code!.isNotEmpty ? '\nCode: ${branch.code}' : ''}',
-                                                    style: const TextStyle(
-                                                      color: Colors.black87,
+                                                    style: TextStyle(
+                                                      color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),
                                                   ),
                                                   onTap: () async {

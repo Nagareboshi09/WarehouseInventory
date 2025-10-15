@@ -98,13 +98,16 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -118,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -130,7 +133,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -142,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -154,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -169,10 +172,10 @@ class _LoginScreenState extends State<LoginScreen>
                       builder: (context, child) {
                         return Transform.scale(
                           scale: _scaleAnimation.value,
-                          child: const Icon(
+                          child: Icon(
                             Icons.inventory,
                             size: 80,
-                            color: Colors.white,
+                            color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         );
                       },
@@ -202,8 +205,8 @@ class _LoginScreenState extends State<LoginScreen>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        color: Colors.white.withOpacity(0.95),
-                        shadowColor: const Color(0xFF0651A4).withOpacity(0.2),
+                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                        shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.2),
                         child: Padding(
                           padding: const EdgeInsets.all(32.0),
                           child: Form(
@@ -211,52 +214,52 @@ class _LoginScreenState extends State<LoginScreen>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Text(
+                                Text(
                                   'Welcome Back',
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0651A4),
+                                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 8),
-                                const Text(
+                                Text(
                                   'Sign in to your account',
                                   style: TextStyle(
                                     fontSize: 16,
-                                    color: Colors.grey,
+                                    color: isDarkMode ? Colors.white70 : Colors.grey,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 32),
                                 TextFormField(
                                   controller: _usernameController,
-                                  style: const TextStyle(color: Colors.black),
+                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                                   decoration: InputDecoration(
                                     labelText: 'Username',
-                                    labelStyle: const TextStyle(
-                                      color: Color(0xFF0651A4),
+                                    labelStyle: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF0651A4),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF0651A4),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         width: 2,
                                       ),
                                     ),
-                                    prefixIcon: const Icon(
+                                    prefixIcon: Icon(
                                       Icons.person,
-                                      color: Color(0xFF0651A4),
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
@@ -268,28 +271,28 @@ class _LoginScreenState extends State<LoginScreen>
                                 const SizedBox(height: 20),
                                 TextFormField(
                                   controller: _passwordController,
-                                  style: const TextStyle(color: Colors.black),
+                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                                   decoration: InputDecoration(
                                     labelText: 'Password',
-                                    labelStyle: const TextStyle(
-                                      color: Color(0xFF0651A4),
+                                    labelStyle: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF0651A4),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
-                                      borderSide: const BorderSide(
-                                        color: Color(0xFF0651A4),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         width: 2,
                                       ),
                                     ),
-                                    prefixIcon: const Icon(
+                                    prefixIcon: Icon(
                                       Icons.lock,
-                                      color: Color(0xFF0651A4),
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     suffixIcon: Container(
                                       margin: const EdgeInsets.only(right: 8),
@@ -298,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           _isPasswordVisible
                                               ? Icons.visibility
                                               : Icons.visibility_off,
-                                          color: const Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           size: 24,
                                         ),
                                         onPressed: () {
@@ -313,7 +316,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       ),
                                     ),
                                     filled: true,
-                                    fillColor: Colors.grey.shade50,
+                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                   ),
                                   obscureText: !_isPasswordVisible,
                                   validator: (value) {
@@ -327,7 +330,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ElevatedButton(
                                   onPressed: _isLoading ? null : _login,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0651A4),
+                                    backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 16,
@@ -338,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     elevation: 6,
                                     shadowColor: const Color(
                                       0xFF0651A4,
-                                    ).withOpacity(0.4),
+                                    ).withOpacity(isDarkMode ? 0.5 : 0.4),
                                   ),
                                   child: _isLoading
                                       ? const CircularProgressIndicator(

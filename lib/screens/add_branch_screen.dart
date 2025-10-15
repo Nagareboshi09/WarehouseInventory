@@ -500,6 +500,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isLoading ? null : _saveBranch,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.blue[900] : null,
         label: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : const Text('Add Branch'),

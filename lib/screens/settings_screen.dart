@@ -101,13 +101,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -121,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -133,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -145,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -157,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -174,9 +177,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               Navigator.of(context).pop();
                             }
                           },
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back,
-                            color: Colors.white,
+                            color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -209,7 +212,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0651A4),
+                              color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -236,11 +239,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 20),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.95),
+                              color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -251,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: const BorderRadius.only(
                                       topLeft: Radius.circular(20),
                                       topRight: Radius.circular(20),
@@ -259,19 +262,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.dark_mode,
-                                        color: Color(0xFF0651A4),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         size: 24,
                                       ),
                                       const SizedBox(width: 12),
-                                      const Expanded(
+                                      Expanded(
                                         child: Text(
                                           'Dark Mode',
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                           ),
                                         ),
                                       ),
@@ -282,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         onChanged: (value) => context
                                             .read<ThemeNotifier>()
                                             .setDarkMode(value),
-                                        activeColor: const Color(0xFF0651A4),
+                                        activeColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
                                       ),
                                     ],
                                   ),
@@ -292,19 +295,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   padding: const EdgeInsets.all(16),
                                   child: Row(
                                     children: [
-                                      const Icon(
+                                      Icon(
                                         Icons.wifi_off,
-                                        color: Color(0xFF0651A4),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         size: 24,
                                       ),
                                       const SizedBox(width: 12),
-                                      const Expanded(
+                                      Expanded(
                                         child: Text(
                                           'Offline Mode',
                                           style: TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                           ),
                                         ),
                                       ),
@@ -315,7 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             _isOfflineMode = value;
                                           });
                                         },
-                                        activeColor: const Color(0xFF0651A4),
+                                        activeColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
                                       ),
                                     ],
                                   ),
@@ -327,7 +330,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0651A4),
+                              color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -354,11 +357,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 16),
                           Container(
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.95),
+                              color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -370,20 +373,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 children: [
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: const Color(
-                                          0xFF0651A4,
-                                        ).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
                                       controller: _currentPasswordController,
                                       decoration: InputDecoration(
                                         labelText: 'Current Password',
-                                        labelStyle: const TextStyle(
-                                          color: Color(0xFF0651A4),
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -391,9 +392,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                               horizontal: 16,
                                               vertical: 12,
                                             ),
-                                        prefixIcon: const Icon(
+                                        prefixIcon: Icon(
                                           Icons.lock_outline,
-                                          color: Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                       ),
                                       obscureText: true,
@@ -402,20 +403,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SizedBox(height: 16),
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: const Color(
-                                          0xFF0651A4,
-                                        ).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
                                       controller: _newPasswordController,
                                       decoration: InputDecoration(
                                         labelText: 'New Password',
-                                        labelStyle: const TextStyle(
-                                          color: Color(0xFF0651A4),
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -423,9 +422,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                               horizontal: 16,
                                               vertical: 12,
                                             ),
-                                        prefixIcon: const Icon(
+                                        prefixIcon: Icon(
                                           Icons.lock_outline,
-                                          color: Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                       ),
                                       obscureText: true,
@@ -434,20 +433,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SizedBox(height: 16),
                                   Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: const Color(
-                                          0xFF0651A4,
-                                        ).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
                                       controller: _confirmPasswordController,
                                       decoration: InputDecoration(
                                         labelText: 'Confirm New Password',
-                                        labelStyle: const TextStyle(
-                                          color: Color(0xFF0651A4),
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -455,9 +452,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                               horizontal: 16,
                                               vertical: 12,
                                             ),
-                                        prefixIcon: const Icon(
+                                        prefixIcon: Icon(
                                           Icons.lock_outline,
-                                          color: Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                       ),
                                       obscureText: true,
@@ -469,7 +466,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     icon: const Icon(Icons.key),
                                     label: const Text('Change Password'),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0651A4),
+                                      backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 24,
@@ -481,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       elevation: 4,
                                       shadowColor: const Color(
                                         0xFF0651A4,
-                                      ).withOpacity(0.3),
+                                      ).withOpacity(isDarkMode ? 0.5 : 0.3),
                                     ),
                                   ),
                                 ],
@@ -495,7 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               icon: const Icon(Icons.save),
                               label: const Text('Save Settings'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0651A4),
+                                backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 32,
@@ -507,7 +504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 elevation: 6,
                                 shadowColor: const Color(
                                   0xFF0651A4,
-                                ).withOpacity(0.3),
+                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
                               ),
                             ),
                           ),

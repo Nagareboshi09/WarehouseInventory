@@ -66,21 +66,24 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
     bool isLogout = false,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+        color: isSelected
+            ? (isDarkMode ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.2))
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(15),
         border: isSelected
-            ? Border.all(color: Colors.white.withOpacity(0.3), width: 1)
+            ? Border.all(color: isDarkMode ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.3), width: 1)
             : null,
       ),
       child: ListTile(
-        leading: Icon(icon, color: Colors.white, size: 28),
+        leading: Icon(icon, color: isDarkMode ? Colors.white70 : Colors.white, size: 28),
         title: Text(
           title,
           style: TextStyle(
-            color: Colors.white,
+            color: isDarkMode ? Colors.white70 : Colors.white,
             fontSize: 16,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
@@ -94,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Warehouse Inventory'),
@@ -108,11 +112,13 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: Drawer(
         width: MediaQuery.of(context).size.width * 0.75, // Make drawer wider
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+              colors: isDarkMode
+                  ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                  : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
             ),
           ),
           child: Column(
@@ -124,8 +130,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   left: 20,
                   right: 20,
                 ),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0651A4),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                   borderRadius: BorderRadius.only(
                     bottomLeft: Radius.circular(30),
                     bottomRight: Radius.circular(30),
@@ -135,13 +141,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     CircleAvatar(
                       radius: 35,
-                      backgroundColor: Colors.white,
+                      backgroundColor: isDarkMode ? Colors.grey[700] : Colors.white,
                       child: Text(
                         _username.isNotEmpty ? _username[0].toUpperCase() : '',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28.0,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0651A4),
+                          color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                         ),
                       ),
                     ),

@@ -155,6 +155,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
     bool isLoading = false;
 
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -164,14 +165,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
-              backgroundColor: Colors.white,
+              backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -183,7 +184,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0651A4),
+                        color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -207,7 +208,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0651A4).withOpacity(0.1),
+                        color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -215,16 +216,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         children: [
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.qr_code,
-                                color: Color(0xFF0651A4),
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'SKU: ${item.sku}',
-                                style: const TextStyle(
-                                  color: Color(0xFF0651A4),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -233,17 +234,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.description,
-                                color: Color(0xFF0651A4),
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Description: ${item.description}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF0651A4),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                   ),
                                 ),
                               ),
@@ -252,16 +253,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.branding_watermark,
-                                color: Color(0xFF0651A4),
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Brand: ${item.brand}',
-                                style: const TextStyle(
-                                  color: Color(0xFF0651A4),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                               ),
                             ],
@@ -269,16 +270,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.location_on,
-                                color: Color(0xFF0651A4),
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 'Location: ${item.location}',
-                                style: const TextStyle(
-                                  color: Color(0xFF0651A4),
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                               ),
                             ],
@@ -289,10 +290,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     const SizedBox(height: 20),
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF0651A4).withOpacity(0.3),
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                         ),
                       ),
                       child: TextField(
@@ -300,16 +301,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: 'New Quantity',
-                          labelStyle: const TextStyle(color: Color(0xFF0651A4)),
+                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                           hintText: 'Enter quantity',
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
-                          prefixIcon: const Icon(
+                          prefixIcon: Icon(
                             Icons.numbers,
-                            color: Color(0xFF0651A4),
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                           ),
                         ),
                       ),
@@ -323,7 +324,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 ? null
                                 : () => Navigator.of(context).pop(),
                             style: TextButton.styleFrom(
-                              foregroundColor: Colors.grey,
+                              foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15),
@@ -430,7 +431,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     });
                                   },
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0651A4),
+                              backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(
@@ -439,7 +440,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               elevation: 4,
                               shadowColor: const Color(
                                 0xFF0651A4,
-                              ).withOpacity(0.3),
+                              ).withOpacity(isDarkMode ? 0.5 : 0.3),
                             ),
                             child: isLoading
                                 ? const SizedBox(
@@ -474,6 +475,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildBranchSelectionView() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -482,28 +484,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF0651A4).withOpacity(0.1),
+              color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.location_on,
               size: 60,
-              color: Color(0xFF0651A4),
+              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Select a Branch',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0651A4),
+              color: isDarkMode ? Colors.white : Color(0xFF0651A4),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Please select a branch to view inventory items',
-            style: TextStyle(fontSize: 16, color: Colors.black87),
+            style: TextStyle(fontSize: 16, color: isDarkMode ? Colors.white70 : Colors.black87),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
@@ -512,10 +514,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withOpacity(isDarkMode ? 0.3 : 0.1),
                 borderRadius: BorderRadius.circular(15),
               ),
-              child: const Text(
+              child: Text(
                 'No branches available',
                 style: TextStyle(color: Colors.red, fontSize: 16),
               ),
@@ -527,13 +529,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -547,7 +552,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -559,7 +564,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -571,7 +576,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -583,7 +588,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -602,9 +607,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               Navigator.of(context).pop();
                             }
                           },
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.arrow_back,
-                            color: Colors.white,
+                            color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -634,11 +639,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.95),
+                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -657,7 +662,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 Container(
                                   margin: const EdgeInsets.all(16.0),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF0651A4),
+                                    color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                     borderRadius: BorderRadius.only(
                                       topLeft: Radius.circular(20),
                                       topRight: Radius.circular(20),
@@ -692,35 +697,35 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     horizontal: 16.0,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: TextField(
                                     decoration: InputDecoration(
                                       labelText: 'Search Inventory',
-                                      labelStyle: const TextStyle(
-                                        color: Color(0xFF0651A4),
+                                      labelStyle: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                       hintText: 'Search by SKU or name',
-                                      prefixIcon: const Icon(
+                                      prefixIcon: Icon(
                                         Icons.search,
-                                        color: Color(0xFF0651A4),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(20),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF0651A4),
+                                        borderSide: BorderSide(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(20),
-                                        borderSide: const BorderSide(
-                                          color: Color(0xFF0651A4),
+                                        borderSide: BorderSide(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           width: 2,
                                         ),
                                       ),
                                       filled: true,
-                                      fillColor: Colors.white,
+                                      fillColor: isDarkMode ? Colors.grey[700] : Colors.white,
                                     ),
                                     onChanged: _filterItems,
                                   ),
@@ -728,7 +733,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                 Container(
                                   margin: const EdgeInsets.all(16.0),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: buildFilterWidget(
@@ -826,16 +831,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   borderRadius:
                                                       BorderRadius.circular(20),
                                                 ),
-                                                color: Colors.white,
+                                                color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(0.2),
+                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(0.1),
+                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.inventory,
                                                       color: Color(0xFF0651A4),
@@ -847,16 +852,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       ),
                                                   title: Text(
                                                     item.description,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      color: Color(0xFF0651A4),
+                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                                     ),
                                                   ),
                                                   subtitle: Text(
                                                     'SKU: ${item.sku} | Brand: ${item.brand}',
-                                                    style: const TextStyle(
-                                                      color: Colors.black87,
+                                                    style: TextStyle(
+                                                      color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),
                                                   ),
                                                   trailing: Container(
@@ -869,11 +874,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       color: item.end <= 10
                                                           ? Colors.red
                                                                 .withOpacity(
-                                                                  0.1,
+                                                                  isDarkMode ? 0.3 : 0.1,
                                                                 )
                                                           : Colors.green
                                                                 .withOpacity(
-                                                                  0.1,
+                                                                  isDarkMode ? 0.3 : 0.1,
                                                                 ),
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -918,6 +923,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   List<Widget> _getBranchSelectionWidgets() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     List<Branch> filteredBranches = _branches.where((branch) {
       return branch.name.toLowerCase().contains(
             _branchSearchQuery.toLowerCase(),
@@ -930,25 +936,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
       Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
           borderRadius: BorderRadius.circular(20),
         ),
         child: TextField(
           decoration: InputDecoration(
             labelText: 'Search Branches',
-            labelStyle: const TextStyle(color: Color(0xFF0651A4)),
+            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
             hintText: 'Search by name or location',
-            prefixIcon: const Icon(Icons.search, color: Color(0xFF0651A4)),
+            prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: Color(0xFF0651A4)),
+              borderSide: BorderSide(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: Color(0xFF0651A4), width: 2),
+              borderSide: BorderSide(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), width: 2),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: isDarkMode ? Colors.grey[700] : Colors.white,
           ),
           onChanged: (value) {
             setState(() {
@@ -961,12 +967,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF0651A4).withOpacity(0.3)),
+            border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
             borderRadius: BorderRadius.circular(20),
-            color: Colors.white,
+            color: isDarkMode ? Colors.grey[800] : Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -978,10 +984,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
             itemBuilder: (context, index) {
               final branch = filteredBranches[index];
               return ListTile(
-                leading: const Icon(Icons.business, color: Color(0xFF0651A4)),
+                leading: Icon(Icons.business, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 title: Text(
                   '${branch.name} (${branch.location})',
-                  style: const TextStyle(color: Color(0xFF0651A4)),
+                  style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 ),
                 onTap: () {
                   setState(() {
@@ -999,12 +1005,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFF0651A4).withOpacity(0.3)),
+          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          color: isDarkMode ? Colors.grey[800] : Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -1013,21 +1019,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
         child: DropdownButton<Branch>(
           value: _selectedBranch,
           isExpanded: true,
-          hint: const Text(
+          hint: Text(
             'Select a branch',
-            style: TextStyle(color: Color(0xFF0651A4)),
+            style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
           ),
           underline: Container(),
-          icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0651A4)),
+          icon: Icon(Icons.arrow_drop_down, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
           items: _branches.map((Branch branch) {
             return DropdownMenuItem<Branch>(
               value: branch,
               child: Text(
                 '${branch.name} (${branch.location})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF0651A4),
+                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                 ),
               ),
             );

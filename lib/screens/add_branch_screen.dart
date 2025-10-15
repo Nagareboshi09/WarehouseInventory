@@ -494,18 +494,16 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               ),
 
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveBranch,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Add Branch'),
-              ),
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isLoading ? null : _saveBranch,
+        label: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text('Add Branch'),
+        icon: const Icon(Icons.add),
       ),
     );
   }

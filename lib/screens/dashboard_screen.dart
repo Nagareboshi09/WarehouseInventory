@@ -34,12 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final branches = await DatabaseHelper.instance.getAllBranches();
       setState(() {
         _branches = branches;
-        if (_branches.isNotEmpty) {
-          _selectedBranch = _branches.first;
-          _loadDataForBranch(_selectedBranch!);
-        } else {
-          _isLoading = false;
-        }
+        _isLoading = false;
       });
     } catch (e) {
       setState(() {

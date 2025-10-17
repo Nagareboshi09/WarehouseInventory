@@ -361,146 +361,355 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add New Branch'),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Branch Name',
-                  prefixIcon: Icon(Icons.store),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a branch name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _branchLocationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location',
-                  prefixIcon: Icon(Icons.location_on),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a location';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _codeController,
-                decoration: const InputDecoration(
-                  labelText: 'Code',
-                  prefixIcon: Icon(Icons.code),
-                  border: OutlineInputBorder(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDarkMode
+                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+          ),
+        ),
+        child: Stack(
+          children: [
+            // Background bubbles
+            Positioned(
+              top: 100,
+              left: 50,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Master Items Section
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+            ),
+            Positioned(
+              top: 200,
+              right: 80,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 150,
+              left: 100,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 250,
+              right: 50,
+              child: Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(isSmallScreen ? 16.0 : 24.0),
+                child: Form(
+                  key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Master Items',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
                             ),
-                          ),
-                          Row(
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.store,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      'Branch Details',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: _nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Branch Name *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.store,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a branch name';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _branchLocationController,
+                              decoration: InputDecoration(
+                                labelText: 'Location *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.location_on,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a location';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _codeController,
+                              decoration: InputDecoration(
+                                labelText: 'Code',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.code,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Master Items Section
+                      Container(
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.file_upload),
-                                tooltip: 'Import from Excel',
-                                onPressed: _importFromExcel,
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.inventory,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Expanded(
+                                      child: Text(
+                                        'Master Items',
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              IconButton(
-                                icon: Icon(_addingItem ? Icons.remove : Icons.add),
-                                tooltip: _addingItem ? 'Cancel Add' : 'Add Item',
-                                onPressed: () {
-                                  setState(() {
-                                    _addingItem = !_addingItem;
-                                  });
-                                },
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Add Items',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.file_upload),
+                                        tooltip: 'Import from Excel',
+                                        onPressed: _importFromExcel,
+                                      ),
+                                      IconButton(
+                                        icon: Icon(_addingItem ? Icons.remove : Icons.add),
+                                        tooltip: _addingItem ? 'Cancel Add' : 'Add Item',
+                                        onPressed: () {
+                                          setState(() {
+                                            _addingItem = !_addingItem;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
+
+                              if (_addingItem) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                    ),
+                                  ),
+                                  padding: const EdgeInsets.all(16),
+                                  child: ItemFormFields(
+                                    skuController: _skuController,
+                                    descriptionController: _descriptionController,
+                                    brandController: _brandController,
+                                    quantityController: _quantityController,
+                                    isReadonly: false,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton.icon(
+                                  onPressed: _addMasterItem,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.add),
+                                  label: const Text('Add Item'),
+                                ),
+                                const SizedBox(height: 16),
+                              ],
+
+                              if (_masterItems.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Added Items:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 8),
+                                ..._masterItems.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final item = entry.value;
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    color: isDarkMode ? Colors.grey[800] : Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: ListTile(
+                                      title: Text('${item.sku} - ${item.description}'),
+                                      subtitle: Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location} - Qty: ${_masterItemQuantities[index]}'),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () => _removeMasterItem(index),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
                             ],
                           ),
-                        ],
+                        ),
                       ),
 
-                      if (_addingItem) ...[
-                        const SizedBox(height: 16),
-                        ItemFormFields(
-                          skuController: _skuController,
-                          descriptionController: _descriptionController,
-                          brandController: _brandController,
-                          quantityController: _quantityController,
-                          isReadonly: false,
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _addMasterItem,
-                          child: const Text('Add Item'),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      if (_masterItems.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Added Items:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        ..._masterItems.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final item = entry.value;
-                          return ListTile(
-                            title: Text('${item.sku} - ${item.description}'),
-                            subtitle: Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location} - Qty: ${_masterItemQuantities[index]}'),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removeMasterItem(index),
-                            ),
-                          );
-                        }).toList(),
-                      ],
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isLoading ? null : _saveBranch,
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.blue[900] : null,
+        backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
         label: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : const Text('Add Branch'),

@@ -187,63 +187,202 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         title: Text('Edit Master Items - \${widget.branch.name}'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search items...',
-                      prefixIcon: Icon(Icons.search),
+          : Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDarkMode
+                      ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
+                      : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Background bubbles
+                  Positioned(
+                    top: 100,
+                    left: 50,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
+                      ),
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
                   ),
-                ),
-                Expanded(
-                  child: _getFilteredItems().isEmpty
-                      ? Center(child: Text(_searchQuery.isNotEmpty ? 'No items match your search' : 'No master items found'))
-                      : ListView.builder(
-                          itemCount: _getFilteredItems().length,
-                          itemBuilder: (context, index) {
-                            final item = _getFilteredItems()[index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              child: ListTile(
-                                title: Text(item.sku),
-                                subtitle: Text('${item.description} • ${item.brand ?? 'No Brand'}'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                                      onPressed: () => _editItem(item),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                      onPressed: () => _deleteItem(item.id!),
-                                    ),
-                                  ],
+                  Positioned(
+                    top: 200,
+                    right: 80,
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 150,
+                    left: 100,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 250,
+                    right: 50,
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  ),
+                  SafeArea(
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
                                 ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search items...',
+                                hintStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.search,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.transparent,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                               ),
-                            );
-                          },
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchQuery = value;
+                                });
+                              },
+                            ),
+                          ),
                         ),
-                ),
-              ],
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: _getFilteredItems().isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(24.0),
+                                        child: Text(
+                                          _searchQuery.isNotEmpty ? 'No items match your search' : 'No master items found',
+                                          style: TextStyle(
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.all(16.0),
+                                      itemCount: _getFilteredItems().length,
+                                      itemBuilder: (context, index) {
+                                        final item = _getFilteredItems()[index];
+                                        return Card(
+                                          margin: const EdgeInsets.symmetric(vertical: 6),
+                                          color: isDarkMode ? Colors.grey[800] : Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(15),
+                                          ),
+                                          shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.2),
+                                          elevation: 4,
+                                          child: ListTile(
+                                            title: Text(
+                                              item.sku,
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            subtitle: Text(
+                                              '${item.description} • ${item.brand ?? 'No Brand'}',
+                                              style: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                              ),
+                                            ),
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.edit, color: Colors.blueAccent),
+                                                  onPressed: () => _editItem(item),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                                  onPressed: () => _deleteItem(item.id!),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addItem,
+        backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
         child: const Icon(Icons.add),
       ),
     );

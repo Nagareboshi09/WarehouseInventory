@@ -16,7 +16,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
   bool _isLoading = true;
   List<MasterItem> _masterItems = [];
   String _searchQuery = '';
-  TextEditingController _searchController = TextEditingController();
+ final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {

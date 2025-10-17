@@ -64,18 +64,18 @@ class _HomeScreenState extends State<HomeScreen> {
     required String title,
     required bool isSelected,
     required VoidCallback onTap,
+    required bool isDarkMode,
     bool isLogout = false,
   }) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: isSelected
-            ? (isDarkMode ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.2))
+            ? (isDarkMode ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.2))
             : Colors.transparent,
         borderRadius: BorderRadius.circular(15),
         border: isSelected
-            ? Border.all(color: isDarkMode ? Colors.white.withOpacity(0.2) : Colors.white.withOpacity(0.3), width: 1)
+            ? Border.all(color: isDarkMode ? Colors.white.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.3), width: 1)
             : null,
       ),
       child: ListTile(
@@ -193,6 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 8),
                     _buildDrawerItem(
@@ -205,6 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 8),
                     _buildDrawerItem(
@@ -217,6 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 8),
                     _buildDrawerItem(
@@ -229,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 8),
                     _buildDrawerItem(
@@ -241,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 8),
                     _buildDrawerItem(
@@ -253,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         Navigator.pop(context);
                       },
+                      isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 20),
                     const Divider(color: Colors.white30, thickness: 1),
@@ -263,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       isSelected: false,
                       onTap: _logout,
                       isLogout: true,
+                      isDarkMode: isDarkMode,
                     ),
                   ],
                 ),

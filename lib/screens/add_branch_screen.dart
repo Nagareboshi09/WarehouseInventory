@@ -479,6 +479,25 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 ],
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _codeController,
+                              decoration: InputDecoration(
+                                labelText: 'Code*',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.code,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                            ),
                             const SizedBox(height: 20),
                             TextFormField(
                               controller: _nameController,
@@ -580,7 +599,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 }
                                 return null;
                               },
-
                             ),
 
                             const SizedBox(height: 16),
@@ -607,27 +625,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 }
                                 return null;
                               },
-
-                            ),
-
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _codeController,
-                              decoration: InputDecoration(
-                                labelText: 'Code',
-                                labelStyle: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.code,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                filled: true,
-                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
-                              ),
                             ),
                           ],
                         ),

@@ -531,6 +531,87 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
+                              controller: _branchLocationController,
+                              decoration: InputDecoration(
+                                labelText: 'Weekly Order Off take: *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.location_on,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a location';
+                                }
+                                return null;
+                              },
+
+                            ),
+                            
+                          const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _branchLocationController,
+                              decoration: InputDecoration(
+                                labelText: 'Weekly ReOrder Point: *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.location_on,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a location';
+                                }
+                                return null;
+                              },
+
+                            ),
+
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _branchLocationController,
+                              decoration: InputDecoration(
+                                labelText: 'Maintaining Inventory: *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.location_on,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a location';
+                                }
+                                return null;
+                              },
+
+                            ),
+
+                            const SizedBox(height: 16),
+                            TextFormField(
                               controller: _codeController,
                               decoration: InputDecoration(
                                 labelText: 'Code',

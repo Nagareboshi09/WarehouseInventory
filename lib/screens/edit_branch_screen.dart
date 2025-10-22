@@ -59,7 +59,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating branch: ${e.toString()}'),
+            content: Text('Error on updating branch: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );

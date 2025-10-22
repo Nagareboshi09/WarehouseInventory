@@ -25,7 +25,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 8,
+        version: 9,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -40,7 +40,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 8, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 9, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -58,7 +58,10 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         location TEXT NOT NULL,
-        code TEXT
+        code TEXT,
+        weeklyOrderOfftake TEXT,
+        weeklyReorderPoint TEXT,
+        maintainingInventory TEXT
       )
     ''');
 
@@ -210,32 +213,15 @@ class DatabaseHelper {
         )
       ''');
     }
-    if (oldVersion < 8) {
-      // Add orders table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          branchId INTEGER NOT NULL,
-          location TEXT NOT NULL,
-          brand TEXT NOT NULL,
-          itemId INTEGER NOT NULL,
-          quantity INTEGER NOT NULL,
-          dateOrdered TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending',
-          batchId TEXT,
-          FOREIGN KEY (branchId) REFERENCES branches (id)
-        )
-      ''');
-    }
     if (oldVersion < 7) {
       // Force recreate master_items and inventory_items tables to fix schema issues
-      
+
       // Fix master_items table
       final masterTableInfo = await db.rawQuery("PRAGMA table_info(master_items)");
       final hasMasterLegacyColumns = masterTableInfo.any((column) =>
         column['name'] == 'itemClassCode' || column['name'] == 'itemClass'
       );
-      
+
       if (hasMasterLegacyColumns || masterTableInfo.isEmpty) {
         try {
           await db.execute('''
@@ -249,7 +235,7 @@ class DatabaseHelper {
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-          
+
           try {
             await db.execute('''
               INSERT INTO master_items_new (id, sku, description, location, brand, branchId)
@@ -258,7 +244,7 @@ class DatabaseHelper {
           } catch (e) {
             print('Could not copy master_items data: $e');
           }
-          
+
           await db.execute('DROP TABLE IF EXISTS master_items');
           await db.execute('ALTER TABLE master_items_new RENAME TO master_items');
         } catch (e) {
@@ -277,11 +263,11 @@ class DatabaseHelper {
           ''');
         }
       }
-      
+
       // Fix inventory_items table
       final invTableInfo = await db.rawQuery("PRAGMA table_info(inventory_items)");
       final hasEndColumn = invTableInfo.any((column) => column['name'] == 'end');
-      
+
       if (!hasEndColumn || invTableInfo.isEmpty) {
         try {
           await db.execute('''
@@ -297,7 +283,7 @@ class DatabaseHelper {
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-          
+
           try {
             // Try to copy with 'end' column if it exists
             await db.execute('''
@@ -316,7 +302,7 @@ class DatabaseHelper {
               print('Could not copy inventory_items data: $e2');
             }
           }
-          
+
           await db.execute('DROP TABLE IF EXISTS inventory_items');
           await db.execute('ALTER TABLE inventory_items_new RENAME TO inventory_items');
         } catch (e) {
@@ -335,7 +321,7 @@ class DatabaseHelper {
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-      
+
           await db.execute('''
             CREATE TABLE orders(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -352,6 +338,12 @@ class DatabaseHelper {
           ''');
         }
       }
+    }
+    if (oldVersion < 9) {
+      // Add new columns for inventory management
+      await db.execute('ALTER TABLE branches ADD COLUMN weeklyOrderOfftake TEXT');
+      await db.execute('ALTER TABLE branches ADD COLUMN weeklyReorderPoint TEXT');
+      await db.execute('ALTER TABLE branches ADD COLUMN maintainingInventory TEXT');
     }
   }
 

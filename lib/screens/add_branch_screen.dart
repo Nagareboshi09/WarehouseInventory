@@ -23,6 +23,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   final _nameController = TextEditingController();
   final _branchLocationController = TextEditingController();
   final _codeController = TextEditingController();
+  final _weeklyOrderOfftakeController = TextEditingController();
+  final _weeklyReorderPointController = TextEditingController();
+  final _maintainingInventoryController = TextEditingController();
   final _skuController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _brandController = TextEditingController();
@@ -296,6 +299,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           'name': _nameController.text.trim(),
           'location': _branchLocationController.text.trim(),
           'code': _codeController.text.trim(),
+          'weeklyOrderOfftake': _weeklyOrderOfftakeController.text.trim(),
+          'weeklyReorderPoint': _weeklyReorderPointController.text.trim(),
+          'maintainingInventory': _maintainingInventoryController.text.trim(),
         };
         final branchId = await txn.insert('branches', branchMap);
 
@@ -350,6 +356,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     _nameController.dispose();
     _branchLocationController.dispose();
     _codeController.dispose();
+    _weeklyOrderOfftakeController.dispose();
+    _weeklyReorderPointController.dispose();
+    _maintainingInventoryController.dispose();
     _skuController.dispose();
     _descriptionController.dispose();
     _brandController.dispose();
@@ -550,14 +559,14 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
-                              controller: _branchLocationController,
+                              controller: _weeklyOrderOfftakeController,
                               decoration: InputDecoration(
                                 labelText: 'Weekly Order Off take: *',
                                 labelStyle: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                                 prefixIcon: Icon(
-                                  Icons.location_on,
+                                  Icons.shopping_cart,
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                                 border: OutlineInputBorder(
@@ -568,34 +577,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter a location';
-                                }
-                                return null;
-                              },
-
-                            ),
-                            
-                          const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _branchLocationController,
-                              decoration: InputDecoration(
-                                labelText: 'Weekly ReOrder Point: *',
-                                labelStyle: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.location_on,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                filled: true,
-                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter a location';
+                                  return 'Please enter a Weekly Order Off take';
                                 }
                                 return null;
                               },
@@ -603,14 +585,14 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
                             const SizedBox(height: 16),
                             TextFormField(
-                              controller: _branchLocationController,
+                              controller: _weeklyReorderPointController,
                               decoration: InputDecoration(
-                                labelText: 'Maintaining Inventory: *',
+                                labelText: 'Weekly ReOrder Point: *',
                                 labelStyle: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                                 prefixIcon: Icon(
-                                  Icons.location_on,
+                                  Icons.warning,
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                                 border: OutlineInputBorder(
@@ -621,7 +603,33 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter a location';
+                                  return 'Please enter ReOrder Point';
+                                }
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _maintainingInventoryController,
+                              decoration: InputDecoration(
+                                labelText: 'Maintaining Inventory: *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.inventory,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter Maintaining Inventory!';
                                 }
                                 return null;
                               },

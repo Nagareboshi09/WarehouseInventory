@@ -284,6 +284,74 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.business,
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Branch: ${_selectedBranch?.name ?? 'Unknown'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.shopping_cart,
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Weekly Order Offtake: ${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.warning,
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.inventory,
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Maintaining Inventory: ${_selectedBranch?.maintainingInventory ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -751,6 +819,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         child: Text('SKU'),
                                       ),
                                       DropdownMenuItem(
+                                        value: 'brand',
+                                        child: Text('Brand'),
+                                      ),
+                                      DropdownMenuItem(
                                         value: 'branch',
                                         child: Text('Branch'),
                                       ),
@@ -782,6 +854,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   item.dateAdded
                                                       .toIso8601String()
                                                       .contains(filterValue);
+                                            case 'brand':
+                                              return (item.brand ?? '')
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
                                             case 'branch':
                                               return _selectedBranch?.name
                                                       .toLowerCase()

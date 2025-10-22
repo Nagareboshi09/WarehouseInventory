@@ -518,7 +518,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter a branch name';
+                                  return 'Please enter a branch name!';
                                 }
                                 return null;
                               },

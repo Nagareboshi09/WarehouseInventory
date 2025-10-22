@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/models/master_item.dart';
 import 'package:warehouse_inventory/models/order.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
+import 'package:warehouse_inventory/screens/master_data_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,7 +17,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   List<Branch> _branches = [];
   Branch? _selectedBranch;
-  int _totalItems = 0;
+  int _totalMasterItems = 0;
+  int _totalInventoryQuantity = 0;
   int _lowStockItems = 0;
   List<Order> _orders = [];
   bool _isLoading = true;
@@ -24,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadBranches();
+    _loadAllData();
   }
 
   Future<void> _loadBranches() async {
@@ -44,19 +48,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _loadAllData() async {
+    if (_selectedBranch == null) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        final allMasterItems = await DatabaseHelper.instance.getAllMasterItems();
+        final allInventoryItems = await DatabaseHelper.instance.getAllInventoryItems();
+        int totalMaster = allMasterItems.length;
+        int totalInventoryQuantity = allInventoryItems.fold(0, (sum, item) => sum + item.end);
+        int lowStock = allInventoryItems.where((item) => item.end <= 10).length;
+        setState(() {
+          _totalMasterItems = totalMaster;
+          _totalInventoryQuantity = totalInventoryQuantity;
+          _lowStockItems = lowStock;
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _isLoading = false;
+        });
+        // Handle error
+      }
+    }
+  }
+
   Future<void> _loadDataForBranch(Branch branch) async {
     setState(() {
       _isLoading = true;
     });
     try {
+      final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
-      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
-      int total = items.length;
+      int totalMaster = masterItems.length;
       int lowStock = items.where((item) => item.end <= 10).length;
+      int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
       setState(() {
-        _totalItems = total;
+        _totalMasterItems = totalMaster;
+        _totalInventoryQuantity = totalInventoryQuantity;
         _lowStockItems = lowStock;
-        _orders = orders;
+        _orders = [];
         _isLoading = false;
       });
     } catch (e) {
@@ -170,6 +202,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     _selectedBranch = newBranch;
                                   });
                                   _loadDataForBranch(newBranch);
+                                } else {
+                                  setState(() {
+                                    _selectedBranch = null;
+                                  });
+                                  _loadAllData();
                                 }
                               },
                             ),
@@ -186,9 +223,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     children: [
                                       _buildAnimatedInfoCard(
                                         'Total Items',
-                                        _totalItems.toString(),
+                                        _totalMasterItems.toString(),
                                         Icons.inventory,
                                         Colors.blue.shade400,
+                                        () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (context) => const MasterDataScreen()),
+                                        ),
                                       ),
                                       const SizedBox(width: 16.0),
                                       _buildAnimatedInfoCard(

@@ -64,7 +64,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Branch updated successfully!'),
+            content: Text('Branch updated successfully!!'),
             backgroundColor: Colors.green,
           ),
         );

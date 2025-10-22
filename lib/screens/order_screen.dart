@@ -24,6 +24,7 @@ class _OrderScreenState extends State<OrderScreen> {
   Branch? _selectedBranch;
   Map<int, TextEditingController> _quantityControllers = {};
   Map<int, int> _orderQuantities = {};
+  Map<String, int> _inventoryStock = {};
   String _searchQuery = '';
   List<MasterItem> _filteredItems = [];
 
@@ -60,9 +61,20 @@ class _OrderScreenState extends State<OrderScreen> {
       final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(
         _selectedBranch!.id!,
       );
+      final inventoryItems = await DatabaseHelper.instance.getInventoryItemsByBranch(
+        _selectedBranch!.id!,
+      );
+
+      // Create a map of SKU to stock quantity
+      final stockMap = <String, int>{};
+      for (var invItem in inventoryItems) {
+        stockMap[invItem.sku] = invItem.end;
+      }
+
       setState(() {
         _masterItems = masterItems;
         _filteredItems = masterItems;
+        _inventoryStock = stockMap;
         // Initialize controllers for each item
         _quantityControllers.clear();
         _orderQuantities.clear();
@@ -167,6 +179,7 @@ class _OrderScreenState extends State<OrderScreen> {
         }
         _searchQuery = '';
         _filteredItems = _masterItems;
+        _inventoryStock.clear();
       });
     }
 
@@ -515,91 +528,168 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 padding: const EdgeInsets.all(
                                                   12,
                                                 ),
-                                                child: Row(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    CircleAvatar(
-                                                      backgroundColor:
-                                                          const Color(
-                                                            0xFF0651A4,
-                                                          ).withOpacity(isDarkMode ? 0.3 : 0.1),
-                                                      child: const Icon(
-                                                        Icons.inventory,
-                                                        color: Color(
-                                                          0xFF0651A4,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            item.description,
-                                                            style:
-                                                                TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                                                                ),
-                                                          ),
-                                                          Text(
-                                                            'SKU: ${item.sku} | Brand: ${item.brand ?? 'N/A'}',
-                                                            style: TextStyle(
-                                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                                              fontSize: 12,
+                                                    Row(
+                                                      children: [
+                                                        CircleAvatar(
+                                                          backgroundColor:
+                                                              const Color(
+                                                                0xFF0651A4,
+                                                              ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                          child: const Icon(
+                                                            Icons.inventory,
+                                                            color: Color(
+                                                              0xFF0651A4,
                                                             ),
                                                           ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                    Container(
-                                                      width: 80,
-                                                      decoration: BoxDecoration(
-                                                        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              15,
-                                                            ),
-                                                        border: Border.all(
-                                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                                         ),
-                                                      ),
-                                                      child: TextField(
-                                                        controller:
-                                                            _quantityControllers[item
-                                                                .id!],
-                                                        decoration: InputDecoration(
-                                                          labelText: 'Qty',
-                                                          border:
-                                                              InputBorder.none,
-                                                          contentPadding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                item.description,
+                                                                style:
+                                                                    TextStyle(
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .bold,
+                                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                                    ),
                                                               ),
+                                                              Row(
+                                                                children: [
+                                                                  Text(
+                                                                    'SKU: ${item.sku}',
+                                                                    style: TextStyle(
+                                                                      color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                                                      fontSize: 12,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(width: 16),
+                                                                  Text(
+                                                                    'Brand: ${item.brand ?? 'N/A'}',
+                                                                    style: TextStyle(
+                                                                      color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                                                      fontSize: 12,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                              Text(
+                                                                'Current Stock: ${_inventoryStock[item.sku] ?? 0}',
+                                                                style: TextStyle(
+                                                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                                                  fontSize: 12,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
                                                         ),
-                                                        keyboardType:
-                                                            TextInputType
-                                                                .number,
-                                                        inputFormatters: [
-                                                          FilteringTextInputFormatter
-                                                              .digitsOnly,
-                                                        ],
-                                                        onChanged: (value) {
-                                                          setState(() {
-                                                            _orderQuantities[item
-                                                                    .id!] =
-                                                                int.tryParse(
-                                                                  value,
-                                                                ) ??
-                                                                0;
-                                                          });
-                                                        },
-                                                      ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 12),
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Container(
+                                                            height: 60,
+                                                            padding: const EdgeInsets.all(8),
+                                                            decoration: BoxDecoration(
+                                                              color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                              border: Border.all(
+                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                                              ),
+                                                            ),
+                                                            child: Column(
+                                                              mainAxisAlignment: MainAxisAlignment.center,
+                                                              children: [
+                                                                Text(
+                                                                  'Needed',
+                                                                  style: TextStyle(
+                                                                    fontSize: 11,
+                                                                    fontWeight: FontWeight.w500,
+                                                                    color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                                                  ),
+                                                                  textAlign: TextAlign.center,
+                                                                ),
+                                                                const SizedBox(height: 2),
+                                                                SizedBox(
+                                                                  height: 24,
+                                                                  child: TextField(
+                                                                    controller: _quantityControllers[item.id!],
+                                                                    textAlign: TextAlign.center,
+                                                                    style: TextStyle(
+                                                                      fontSize: 14,
+                                                                      fontWeight: FontWeight.bold,
+                                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                                    ),
+                                                                    decoration: InputDecoration(
+                                                                      hintText: '0',
+                                                                      border: InputBorder.none,
+                                                                      contentPadding: EdgeInsets.zero,
+                                                                      isDense: true,
+                                                                    ),
+                                                                    keyboardType: TextInputType.number,
+                                                                    inputFormatters: [
+                                                                      FilteringTextInputFormatter.digitsOnly,
+                                                                    ],
+                                                                    onChanged: (value) {
+                                                                      setState(() {
+                                                                        _orderQuantities[item.id!] = int.tryParse(value) ?? 0;
+                                                                      });
+                                                                    },
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Container(
+                                                            height: 60,
+                                                            padding: const EdgeInsets.all(8),
+                                                            decoration: BoxDecoration(
+                                                              color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                              border: Border.all(
+                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                                              ),
+                                                            ),
+                                                            child: Column(
+                                                              mainAxisAlignment: MainAxisAlignment.center,
+                                                              children: [
+                                                                Text(
+                                                                  'Replenishment',
+                                                                  style: TextStyle(
+                                                                    fontSize: 11,
+                                                                    fontWeight: FontWeight.w500,
+                                                                    color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                                                  ),
+                                                                  textAlign: TextAlign.center,
+                                                                ),
+                                                                const SizedBox(height: 2),
+                                                                Text(
+                                                                  '${_inventoryStock[item.sku] ?? 0}',
+                                                                  style: TextStyle(
+                                                                    fontSize: 14,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                                  ),
+                                                                  textAlign: TextAlign.center,
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ],
                                                 ),

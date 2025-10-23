@@ -54,14 +54,21 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       return;
     }
 
+    final sku = _skuController.text.trim();
     final quantity = int.tryParse(_quantityController.text.trim());
     if (quantity == null || quantity < 0) {
       _showSnackBar('Please enter a valid quantity', Colors.red);
       return;
     }
 
+    // Check for duplicate SKU in the current list
+    if (_masterItems.any((item) => item.sku == sku)) {
+      _showSnackBar('Item with SKU "$sku" already exists in this branch. Please use a different SKU.', Colors.red);
+      return;
+    }
+
     final masterItem = MasterItem(
-      sku: _skuController.text.trim(),
+      sku: sku,
       description: _descriptionController.text.trim(),
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       location: _branchLocationController.text.trim(),
@@ -248,6 +255,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             }
           }
 
+          // Check for duplicate SKU in imported items
+          if (importedItems.any((item) => item.sku == sku)) {
+            _logger.info('Skipping duplicate SKU "$sku" from row $rowIndex');
+            continue;
+          }
+
           // Allow items with null or any numeric quantity (including 0)
           _logger.info('Adding item from row $rowIndex');
 
@@ -271,10 +284,18 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           return;
         }
 
-        setState(() {
-          _masterItems.addAll(importedItems);
-          _masterItemQuantities.addAll(importedQuantities);
-        });
+        // Filter out duplicates when adding to the list
+        for (var i = 0; i < importedItems.length; i++) {
+          final item = importedItems[i];
+          final quantity = importedQuantities[i];
+
+          if (!_masterItems.any((existing) => existing.sku == item.sku)) {
+            _masterItems.add(item);
+            _masterItemQuantities.add(quantity);
+          }
+        }
+
+        setState(() {});
 
         _showSnackBar('Imported ${importedItems.length} items from Excel', Colors.green);
       }
@@ -305,21 +326,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           _showSnackBar('Branch code already exists. Please choose a different code.', Colors.red);
         }
         return;
-      }
-
-      // Check for unique item SKUs within this branch (but allow same SKU in different branches)
-      for (var item in _masterItems) {
-        final existingItem = await db.query(
-          'master_items',
-          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
-          whereArgs: [item.sku, _codeController.text.trim()],
-        );
-        if (existingItem.isNotEmpty) {
-          if (mounted) {
-            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
-          }
-          return;
-        }
       }
 
       await db.transaction((txn) async {

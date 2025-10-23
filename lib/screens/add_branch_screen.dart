@@ -293,6 +293,35 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
     try {
       final db = await DatabaseHelper.instance.database;
+
+      // Check for unique branch code
+      final existingBranch = await db.query(
+        'branches',
+        where: 'code = ?',
+        whereArgs: [_codeController.text.trim()],
+      );
+      if (existingBranch.isNotEmpty) {
+        if (mounted) {
+          _showSnackBar('Branch code already exists. Please choose a different code.', Colors.red);
+        }
+        return;
+      }
+
+      // Check for unique item SKUs within this branch (but allow same SKU in different branches)
+      for (var item in _masterItems) {
+        final existingItem = await db.query(
+          'master_items',
+          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
+          whereArgs: [item.sku, _codeController.text.trim()],
+        );
+        if (existingItem.isNotEmpty) {
+          if (mounted) {
+            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
+          }
+          return;
+        }
+      }
+
       await db.transaction((txn) async {
         // Insert the branch first
         final branchMap = {
@@ -506,6 +535,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 filled: true,
                                 fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                               ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter a branch code';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 20),
                             TextFormField(

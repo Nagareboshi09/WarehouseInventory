@@ -61,7 +61,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         location TEXT NOT NULL,
-        code TEXT,
+        code TEXT UNIQUE,
         weeklyOrderOfftake TEXT,
         weeklyReorderPoint TEXT,
         maintainingInventory TEXT
@@ -276,7 +276,8 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               branchId INTEGER NOT NULL,
-              FOREIGN KEY (branchId) REFERENCES branches (id)
+              FOREIGN KEY (branchId) REFERENCES branches (id),
+              UNIQUE(sku, branchId)
             )
           ''');
         }
@@ -362,6 +363,74 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE branches ADD COLUMN weeklyOrderOfftake TEXT');
       await db.execute('ALTER TABLE branches ADD COLUMN weeklyReorderPoint TEXT');
       await db.execute('ALTER TABLE branches ADD COLUMN maintainingInventory TEXT');
+    }
+    if (oldVersion < 10) {
+      // Add unique constraints for branch codes and item SKUs
+      // First, handle potential duplicates by updating them to null or appending suffix
+      try {
+        // For branches with duplicate codes, keep the first one and set others to null
+        final duplicateBranches = await db.rawQuery('''
+          SELECT code, COUNT(*) as count
+          FROM branches
+          WHERE code IS NOT NULL
+          GROUP BY code
+          HAVING count > 1
+        ''');
+
+        for (var row in duplicateBranches) {
+          final code = row['code'];
+          // Update all but the first occurrence to have null code
+          await db.rawUpdate('''
+            UPDATE branches
+            SET code = NULL
+            WHERE code = ? AND id NOT IN (
+              SELECT MIN(id) FROM branches WHERE code = ?
+            )
+          ''', [code, code]);
+        }
+
+        await db.execute('CREATE UNIQUE INDEX idx_branches_code ON branches(code)');
+      } catch (e) {
+        print('Could not create unique index on branches.code: $e');
+      }
+
+      try {
+        // For master_items with duplicate SKUs within the same branch, keep the first one and append suffix to others
+        final duplicateItems = await db.rawQuery('''
+          SELECT sku, branchId, COUNT(*) as count
+          FROM master_items
+          GROUP BY sku, branchId
+          HAVING count > 1
+        ''');
+
+        for (var row in duplicateItems) {
+          final sku = row['sku'];
+          final branchId = row['branchId'];
+          // Get all items with this SKU in this branch except the first one
+          final duplicateRows = await db.rawQuery('''
+            SELECT id FROM master_items
+            WHERE sku = ? AND branchId = ?
+            ORDER BY id
+            LIMIT -1 OFFSET 1
+          ''', [sku, branchId]);
+
+          int suffix = 1;
+          for (var dupRow in duplicateRows) {
+            final newSku = '${sku}_dup_$suffix';
+            await db.update(
+              'master_items',
+              {'sku': newSku},
+              where: 'id = ?',
+              whereArgs: [dupRow['id']],
+            );
+            suffix++;
+          }
+        }
+
+        await db.execute('CREATE UNIQUE INDEX idx_master_items_sku_branch ON master_items(sku, branchId)');
+      } catch (e) {
+        print('Could not create unique index on master_items.sku per branch: $e');
+      }
     }
   }
 

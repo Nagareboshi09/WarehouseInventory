@@ -13,6 +13,15 @@ class OrderListScreen extends StatefulWidget {
 
 class _OrderListScreenState extends State<OrderListScreen> {
   @override
+  void initState() {
+    super.initState();
+    // Refresh orders when screen is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<OrderProvider>().loadOrders();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Consumer<OrderProvider>(

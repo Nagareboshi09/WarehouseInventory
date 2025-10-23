@@ -20,19 +20,22 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    
+
     if (kIsWeb) {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 9,
+        version: 10,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
     } else {
       _database = await _initDB('warehouse_inventory.db');
     }
-    
+
+    // Ensure orders table exists
+    await _ensureOrdersTableExists();
+
     return _database!;
   }
 
@@ -40,7 +43,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 9, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 10, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -87,6 +90,21 @@ class DatabaseHelper {
         brand TEXT,
         dateAdded TEXT NOT NULL,
         branchId INTEGER NOT NULL,
+        FOREIGN KEY (branchId) REFERENCES branches (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE orders(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        branchId INTEGER NOT NULL,
+        location TEXT NOT NULL,
+        brand TEXT NOT NULL,
+        itemId INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        dateOrdered TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        batchId TEXT,
         FOREIGN KEY (branchId) REFERENCES branches (id)
       )
     ''');
@@ -199,7 +217,7 @@ class DatabaseHelper {
     if (oldVersion < 6) {
       // Add orders table
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
+        CREATE TABLE orders(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           branchId INTEGER NOT NULL,
           location TEXT NOT NULL,
@@ -323,7 +341,7 @@ class DatabaseHelper {
           ''');
 
           await db.execute('''
-            CREATE TABLE orders(
+            CREATE TABLE IF NOT EXISTS orders(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               branchId INTEGER NOT NULL,
               location TEXT NOT NULL,
@@ -344,6 +362,33 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE branches ADD COLUMN weeklyOrderOfftake TEXT');
       await db.execute('ALTER TABLE branches ADD COLUMN weeklyReorderPoint TEXT');
       await db.execute('ALTER TABLE branches ADD COLUMN maintainingInventory TEXT');
+    }
+  }
+
+  Future<void> _ensureOrdersTableExists() async {
+    final db = await database;
+    try {
+      // Check if orders table exists
+      final result = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'");
+      if (result.isEmpty) {
+        // Create orders table if it doesn't exist
+        await db.execute('''
+          CREATE TABLE orders(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            branchId INTEGER NOT NULL,
+            location TEXT NOT NULL,
+            brand TEXT NOT NULL,
+            itemId INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            dateOrdered TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            batchId TEXT,
+            FOREIGN KEY (branchId) REFERENCES branches (id)
+          )
+        ''');
+      }
+    } catch (e) {
+      print('Error ensuring orders table exists: $e');
     }
   }
 

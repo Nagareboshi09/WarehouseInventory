@@ -151,12 +151,27 @@ class _OrderScreenState extends State<OrderScreen> {
     }
 
     // Add orders to provider
-    for (var order in orders) {
-      context.read<OrderProvider>().addOrder(order);
+    try {
+      for (var order in orders) {
+        await context.read<OrderProvider>().addOrder(order);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving orders: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
+      return;
     }
 
     // Simulate order submission
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -677,7 +692,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                 ),
                                                                 const SizedBox(height: 2),
                                                                 Text(
-                                                                  '${_inventoryStock[item.sku] ?? 0}',
+                                                                  '${(_inventoryStock[item.sku] ?? 0) <= 10 ? (20 - (_inventoryStock[item.sku] ?? 0)) : 0}',
                                                                   style: TextStyle(
                                                                     fontSize: 14,
                                                                     fontWeight: FontWeight.bold,

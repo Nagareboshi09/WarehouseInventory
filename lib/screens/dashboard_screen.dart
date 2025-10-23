@@ -106,8 +106,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('Dashboard'),
         automaticallyImplyLeading: false,
-        titleSpacing: MediaQuery.of(context).size.width < 600 ? 0.0 : 16.0,
+        titleSpacing: 16.0,
         elevation: 0,
+        centerTitle: false,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

@@ -5,6 +5,8 @@ import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_inventory_item_screen.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch});
@@ -147,6 +149,94 @@ class _InventoryScreenState extends State<InventoryScreen> {
         }).toList();
       }
     });
+  }
+
+  Future<void> _exportInventoryToFile() async {
+    if (_selectedBranch == null || _inventoryItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No inventory data to export'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Try different storage locations for better compatibility
+      Directory? directory;
+
+      // Try external storage first (Android)
+      try {
+        directory = await getExternalStorageDirectory();
+        if (directory != null) {
+          final downloadDir = Directory('${directory.path}/Download');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+          directory = downloadDir;
+        }
+      } catch (e) {
+        // Fallback to application documents directory
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        throw Exception('Unable to access storage directory');
+      }
+
+      final fileName = '${_selectedBranch!.name.replaceAll(' ', '_')}_inventory_${DateTime.now().toIso8601String().split('T')[0]}.csv';
+      final file = File('${directory.path}/$fileName');
+
+      // Create CSV header
+      String csvContent = 'SKU,Description,Brand,Location,Quantity,Date Added\n';
+
+      // Add inventory items
+      for (var item in _inventoryItems) {
+        final brand = item.brand ?? 'N/A';
+        final dateAdded = '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+        csvContent += '${item.sku},"${item.description}",$brand,${item.location},${item.end},$dateAdded\n';
+      }
+
+      await file.writeAsString(csvContent);
+
+      final filePath = '${directory.path}/$fileName';
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Inventory exported successfully!\nFile: $fileName\nLocation: ${directory.path}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Show Path',
+              textColor: Colors.white,
+              onPressed: () async {
+                // Show the file path in another snackbar
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('File location: $filePath\nUse your file manager to navigate to this path and open the CSV file.'),
+                      backgroundColor: Colors.blue,
+                      duration: const Duration(seconds: 15),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting inventory: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {

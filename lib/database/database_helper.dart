@@ -25,7 +25,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 10,
+        version: 11,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -43,7 +43,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 10, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 11, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -89,6 +89,7 @@ class DatabaseHelper {
         location TEXT NOT NULL,
         brand TEXT,
         dateAdded TEXT NOT NULL,
+        dateUpdated TEXT,
         branchId INTEGER NOT NULL,
         FOREIGN KEY (branchId) REFERENCES branches (id)
       )
@@ -298,6 +299,7 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
+              dateUpdated TEXT,
               branchId INTEGER NOT NULL,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
@@ -336,6 +338,7 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
+              dateUpdated TEXT,
               branchId INTEGER NOT NULL,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
@@ -430,6 +433,14 @@ class DatabaseHelper {
         await db.execute('CREATE UNIQUE INDEX idx_master_items_sku_branch ON master_items(sku, branchId)');
       } catch (e) {
         print('Could not create unique index on master_items.sku per branch: $e');
+      }
+    }
+    if (oldVersion < 11) {
+      // Add dateUpdated column to inventory_items table
+      try {
+        await db.execute('ALTER TABLE inventory_items ADD COLUMN dateUpdated TEXT');
+      } catch (e) {
+        print('Could not add dateUpdated column to inventory_items: $e');
       }
     }
   }
@@ -775,9 +786,20 @@ class DatabaseHelper {
 
   Future<void> updateInventoryItem(InventoryItem item) async {
     final db = await instance.database;
+    final updatedItem = InventoryItem(
+      id: item.id,
+      sku: item.sku,
+      description: item.description,
+      end: item.end,
+      location: item.location,
+      brand: item.brand,
+      dateAdded: item.dateAdded,
+      dateUpdated: DateTime.now(),
+      branchId: item.branchId,
+    );
     await db.update(
       'inventory_items',
-      item.toMap(),
+      updatedItem.toMap(),
       where: 'id = ?',
       whereArgs: [item.id],
     );

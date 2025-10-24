@@ -426,7 +426,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                                'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
                                 style: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
@@ -1035,7 +1035,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     ),
                                                   ),
                                                   subtitle: Text(
-                                                    'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.dateUpdated != null ? '${item.dateUpdated!.year}-${item.dateUpdated!.month.toString().padLeft(2, '0')}-${item.dateUpdated!.day.toString().padLeft(2, '0')} ${_formatTime(item.dateUpdated!)}' : 'Never'}',
+                                                    'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.dateUpdated != null ? '${item.dateUpdated!.year}-${item.dateUpdated!.month.toString().padLeft(2, '0')}-${item.dateUpdated!.day.toString().padLeft(2, '0')} ${_formatTime(item.dateUpdated!)}' : 'Not yet updated'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                       fontSize: 12,

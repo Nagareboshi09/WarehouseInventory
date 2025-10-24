@@ -107,6 +107,19 @@ class _OrderScreenState extends State<OrderScreen> {
 
     await _loadMasterItems();
 
+    // Filter master items to only show those in the batch
+    final batchItemIds = batchOrders.map((order) => order.itemId).toSet();
+    _masterItems = _masterItems.where((item) => batchItemIds.contains(item.id)).toList();
+    _filteredItems = _masterItems;
+
+    // Reinitialize controllers and quantities for filtered items
+    _quantityControllers.clear();
+    _orderQuantities.clear();
+    for (var item in _masterItems) {
+      _quantityControllers[item.id!] = TextEditingController();
+      _orderQuantities[item.id!] = 0;
+    }
+
     // Load quantities from the batch
     for (final order in batchOrders) {
       if (_quantityControllers.containsKey(order.itemId)) {

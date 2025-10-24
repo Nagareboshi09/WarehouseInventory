@@ -418,7 +418,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                                'Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
                                 style: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),

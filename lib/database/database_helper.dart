@@ -838,6 +838,16 @@ class DatabaseHelper {
     return result.map((json) => Order.fromMap(json)).toList();
   }
 
+  Future<List<Order>> getOrdersByBatchId(String batchId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'orders',
+      where: 'batchId = ?',
+      whereArgs: [batchId],
+    );
+    return result.map((json) => Order.fromMap(json)).toList();
+  }
+
   Future<void> updateOrder(Order order) async {
     final db = await instance.database;
     await db.update(

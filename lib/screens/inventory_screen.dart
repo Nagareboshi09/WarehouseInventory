@@ -210,7 +210,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
       final filePath = '${directory.path}/$fileName';
 
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Inventory exported successfully!\nFile: $fileName\nLocation: ${directory.path}'),
@@ -221,7 +221,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               textColor: Colors.white,
               onPressed: () async {
                 // Show the file path in another snackbar
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('File location: $filePath\nUse your file manager to navigate to this path and open the CSV file.'),
@@ -236,7 +236,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error exporting inventory: ${e.toString()}'),
@@ -532,7 +532,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         await DatabaseHelper.instance
                                             .updateInventoryItem(updatedItem);
 
-                                        if (mounted) {
+                                        if (context.mounted) {
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(
@@ -553,7 +553,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           _loadInventoryItems(); // Refresh the list
                                         }
                                       } catch (e) {
-                                        if (mounted) {
+                                        if (context.mounted) {
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(
@@ -573,7 +573,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         }
                                       }
                                     } else {
-                                      if (mounted) {
+                                      if (context.mounted) {
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(

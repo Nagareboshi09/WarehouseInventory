@@ -628,7 +628,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                             TextFormField(
                               controller: _weeklyReorderPointController,
                               decoration: InputDecoration(
-                                labelText: 'Weekly ReOrder Point: *',
+                                labelText: 'ReOrder Point *',
                                 labelStyle: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),

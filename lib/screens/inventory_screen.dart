@@ -151,6 +151,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    return '$displayHour:$minute $period';
+  }
+
   Future<void> _exportInventoryToFile() async {
     if (_selectedBranch == null || _inventoryItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1027,9 +1035,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     ),
                                                   ),
                                                   subtitle: Text(
-                                                    'SKU: ${item.sku} | Brand: ${item.brand}',
+                                                    'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.dateUpdated != null ? '${item.dateUpdated!.year}-${item.dateUpdated!.month.toString().padLeft(2, '0')}-${item.dateUpdated!.day.toString().padLeft(2, '0')} ${_formatTime(item.dateUpdated!)}' : 'Never'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
+                                                      fontSize: 12,
                                                     ),
                                                   ),
                                                   trailing: Container(
@@ -1064,7 +1073,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       ),
                                                     ),
                                                   ),
-                                                  isThreeLine: false,
+                                                  isThreeLine: true,
                                                 ),
                                               );
                                             },

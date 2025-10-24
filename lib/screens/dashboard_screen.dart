@@ -81,6 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
+      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
       int totalMaster = masterItems.length;
       int lowStock = items.where((item) => item.end <= 10).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
@@ -88,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _totalMasterItems = totalMaster;
         _totalInventoryQuantity = totalInventoryQuantity;
         _lowStockItems = lowStock;
-        _orders = [];
+        _orders = orders;
         _isLoading = false;
       });
     } catch (e) {

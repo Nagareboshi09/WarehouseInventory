@@ -432,7 +432,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -444,7 +444,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),     
                 ),
               ),
             ),
@@ -456,7 +456,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -468,7 +468,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -482,11 +482,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),

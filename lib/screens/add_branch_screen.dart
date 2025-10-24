@@ -683,11 +683,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       // Master Items Section
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -764,7 +764,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                     color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                     ),
                                   ),
                                   padding: const EdgeInsets.all(16),

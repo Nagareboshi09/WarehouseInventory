@@ -133,7 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -145,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 60,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                       ),
                     ),
                   ),
@@ -157,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -169,7 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 70,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                   ),
@@ -326,8 +326,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  color.withOpacity(0.1),
-                  color.withOpacity(0.05),
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
                 ],
               ),
             ),

@@ -270,7 +270,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -306,7 +306,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                        color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -459,7 +459,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                         ),
                       ),
                       child: TextField(
@@ -606,7 +606,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               elevation: 4,
                               shadowColor: const Color(
                                 0xFF0651A4,
-                              ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                              ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                             ),
                             child: isLoading
                                 ? const SizedBox(
@@ -650,7 +650,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+              color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -680,7 +680,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(isDarkMode ? 0.3 : 0.1),
+                color: Colors.red.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Text(
@@ -718,7 +718,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -730,7 +730,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -742,7 +742,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -754,7 +754,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -791,7 +791,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -805,11 +805,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                        color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                            color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -1010,13 +1010,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                 color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                                ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                        ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.inventory,
                                                       color: Color(0xFF0651A4),
@@ -1050,12 +1050,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     decoration: BoxDecoration(
                                                       color: item.end <= 10
                                                           ? Colors.red
-                                                                .withOpacity(
-                                                                  isDarkMode ? 0.3 : 0.1,
+                                                                .withValues(
+                                                                  alpha: isDarkMode ? 0.3 : 0.1,
                                                                 )
                                                           : Colors.green
-                                                                .withOpacity(
-                                                                  isDarkMode ? 0.3 : 0.1,
+                                                                .withValues(
+                                                                  alpha: isDarkMode ? 0.3 : 0.1,
                                                                 ),
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -1144,12 +1144,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
+            border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(20),
             color: isDarkMode ? Colors.grey[800] : Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -1182,12 +1182,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
+          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(20),
           color: isDarkMode ? Colors.grey[800] : Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

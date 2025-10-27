@@ -81,6 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
+      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
       int totalMaster = masterItems.length;
       int lowStock = items.where((item) => item.end <= 10).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
@@ -88,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _totalMasterItems = totalMaster;
         _totalInventoryQuantity = totalInventoryQuantity;
         _lowStockItems = lowStock;
-        _orders = [];
+        _orders = orders;
         _isLoading = false;
       });
     } catch (e) {
@@ -133,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -145,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 60,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                       ),
                     ),
                   ),
@@ -157,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -169,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 70,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                   ),
@@ -326,8 +327,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  color.withOpacity(0.1),
-                  color.withOpacity(0.05),
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
                 ],
               ),
             ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:warehouse_inventory/models/order.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/screens/order_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({super.key});
@@ -12,7 +13,8 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  @override
+  List<Order>? _recentlyDeletedBatch;
+  bool _showUndoButton = false;
   void initState() {
     super.initState();
     // Refresh orders when screen is opened
@@ -150,6 +152,31 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           ],
                         ),
                       ),
+                      // Undo button that appears after 5 seconds
+                      if (_showUndoButton && _recentlyDeletedBatch != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          child: ElevatedButton.icon(
+                            onPressed: _undoDelete,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 4,
+                            ),
+                            icon: const Icon(Icons.undo),
+                            label: const Text(
+                              'Undo Delete',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       Expanded(
                         child: batchList.isEmpty
                             ? Center(
@@ -390,6 +417,125 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
+  void _deleteBatch(BuildContext context, List<Order> batchOrders) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Batch'),
+          content: Text('Are you sure you want to delete this batch of ${batchOrders.length} orders?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      // Store the batch for potential undo
+      setState(() {
+        _recentlyDeletedBatch = List.from(batchOrders);
+        _showUndoButton = false; // Hide any existing undo button
+      });
+
+      try {
+        for (final order in batchOrders) {
+          await context.read<OrderProvider>().removeOrder(order);
+        }
+        Navigator.of(context).pop(); // Close the batch details dialog
+
+        // Show undo snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Batch deleted successfully'),
+            backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: Colors.white,
+              onPressed: _undoDelete,
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+
+        // Show undo button after 5 seconds
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted && _recentlyDeletedBatch != null) {
+            setState(() {
+              _showUndoButton = true;
+            });
+          }
+        });
+      } catch (e) {
+        // Clear the stored batch if deletion failed
+        setState(() {
+          _recentlyDeletedBatch = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting batch: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _editBatch(BuildContext context, List<Order> batchOrders) {
+    Navigator.of(context).pop(); // Close the batch details dialog
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderScreen(batchToEdit: batchOrders),
+      ),
+    );
+  }
+
+  void _saveBatch(BuildContext context, List<Order> batchOrders) {
+    // For now, just show a message that the batch is already saved
+    // In a real app, you might want to export or save to a file
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Batch is already saved in the database'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _undoDelete() async {
+    if (_recentlyDeletedBatch == null) return;
+
+    try {
+      for (final order in _recentlyDeletedBatch!) {
+        await context.read<OrderProvider>().addOrder(order);
+      }
+      setState(() {
+        _recentlyDeletedBatch = null;
+        _showUndoButton = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Batch restored successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error restoring batch: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showBatchDetails(BuildContext context, List<Order> batchOrders) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
@@ -530,6 +676,79 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _deleteBatch(context, batchOrders),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 4,
+                        ),
+                        icon: const Icon(Icons.delete),
+                        label: const Text(
+                          'Delete',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _editBatch(context, batchOrders),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 4,
+                        ),
+                        icon: const Icon(Icons.edit),
+                        label: const Text(
+                          'Edit',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _saveBatch(context, batchOrders),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 4,
+                        ),
+                        icon: const Icon(Icons.save),
+                        label: const Text(
+                          'Save',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

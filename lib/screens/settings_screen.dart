@@ -124,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -136,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -148,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -160,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -193,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -239,11 +239,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 20),
                           Container(
                             decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                              color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -285,7 +285,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         onChanged: (value) => context
                                             .read<ThemeNotifier>()
                                             .setDarkMode(value),
-                                        activeColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
+                                        activeThumbColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
                                       ),
                                     ],
                                   ),
@@ -318,7 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             _isOfflineMode = value;
                                           });
                                         },
-                                        activeColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
+                                        activeThumbColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
                                       ),
                                     ],
                                   ),
@@ -357,11 +357,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 16),
                           Container(
                             decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                              color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
@@ -376,7 +376,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -406,7 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -436,7 +436,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -478,7 +478,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       elevation: 4,
                                       shadowColor: const Color(
                                         0xFF0651A4,
-                                      ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                                      ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                                     ),
                                   ),
                                 ],
@@ -504,7 +504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 elevation: 6,
                                 shadowColor: const Color(
                                   0xFF0651A4,
-                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                                ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                               ),
                             ),
                           ),

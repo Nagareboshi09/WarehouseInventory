@@ -9,35 +9,29 @@ import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-   final List<Order>? batchToEdit;
+  const OrderScreen({super.key});
 
-   const OrderScreen({super.key, this.batchToEdit});
-
-   @override
-   State<OrderScreen> createState() => _OrderScreenState();
- }
+  @override
+  State<OrderScreen> createState() => _OrderScreenState();
+}
 
 class _OrderScreenState extends State<OrderScreen> {
-   final _formKey = GlobalKey<FormState>();
-   final _locationController = TextEditingController();
-   bool _isLoading = false;
-   List<Branch> _branches = [];
-   List<MasterItem> _masterItems = [];
-   Branch? _selectedBranch;
-   Map<int, TextEditingController> _quantityControllers = {};
-   Map<int, int> _orderQuantities = {};
-   Map<String, int> _inventoryStock = {};
-   String _searchQuery = '';
-   List<MasterItem> _filteredItems = [];
-   String? _editingBatchId;
+  final _formKey = GlobalKey<FormState>();
+  final _locationController = TextEditingController();
+  bool _isLoading = false;
+  List<Branch> _branches = [];
+  List<MasterItem> _masterItems = [];
+  Branch? _selectedBranch;
+  Map<int, TextEditingController> _quantityControllers = {};
+  Map<int, int> _orderQuantities = {};
+  Map<String, int> _inventoryStock = {};
+  String _searchQuery = '';
+  List<MasterItem> _filteredItems = [];
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    if (widget.batchToEdit != null) {
-      _loadBatchForEditing(widget.batchToEdit!);
-    }
   }
 
   Future<void> _loadData() async {
@@ -57,74 +51,6 @@ class _OrderScreenState extends State<OrderScreen> {
             backgroundColor: Colors.red,
           ),
         );
-      }
-    }
-  }
-
-  Future<void> _loadBatchForEditing(List<Order> batchOrders) async {
-    if (batchOrders.isEmpty) return;
-
-    final firstOrder = batchOrders.first;
-    _editingBatchId = firstOrder.batchId;
-
-    // Load branches if not already loaded
-    if (_branches.isEmpty) {
-      try {
-        final branches = await DatabaseHelper.instance.getAllBranches();
-        setState(() {
-          _branches = branches;
-        });
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error loading branches: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    // Find the branch
-    Branch? branch;
-    try {
-      branch = _branches.firstWhere(
-        (b) => b.id == firstOrder.branchId,
-      );
-    } catch (e) {
-      // Branch not found, create a temporary one for display
-      branch = Branch(id: firstOrder.branchId, name: 'Unknown Branch', location: firstOrder.location);
-      // Add it to the list temporarily
-      _branches.add(branch);
-    }
-
-    setState(() {
-      _selectedBranch = branch;
-      _locationController.text = firstOrder.location;
-    });
-
-    await _loadMasterItems();
-
-    // Filter master items to only show those in the batch
-    final batchItemIds = batchOrders.map((order) => order.itemId).toSet();
-    _masterItems = _masterItems.where((item) => batchItemIds.contains(item.id)).toList();
-    _filteredItems = _masterItems;
-
-    // Reinitialize controllers and quantities for filtered items
-    _quantityControllers.clear();
-    _orderQuantities.clear();
-    for (var item in _masterItems) {
-      _quantityControllers[item.id!] = TextEditingController();
-      _orderQuantities[item.id!] = 0;
-    }
-
-    // Load quantities from the batch
-    for (final order in batchOrders) {
-      if (_quantityControllers.containsKey(order.itemId)) {
-        _quantityControllers[order.itemId]!.text = order.quantity.toString();
-        _orderQuantities[order.itemId] = order.quantity;
       }
     }
   }
@@ -203,20 +129,8 @@ class _OrderScreenState extends State<OrderScreen> {
       _isLoading = true;
     });
 
-    // If editing, delete existing batch first
-    if (_editingBatchId != null) {
-      try {
-        final existingOrders = await DatabaseHelper.instance.getOrdersByBatchId(_editingBatchId!);
-        for (final order in existingOrders) {
-          await context.read<OrderProvider>().removeOrder(order);
-        }
-      } catch (e) {
-        print('Error deleting existing batch: $e');
-      }
-    }
-
-    // Generate a unique batch ID for this order session (or use existing if editing)
-    final batchId = _editingBatchId ?? DateTime.now().millisecondsSinceEpoch.toString();
+    // Generate a unique batch ID for this order session
+    final batchId = DateTime.now().millisecondsSinceEpoch.toString();
 
     // Create orders for each item with quantity > 0
     List<Order> orders = [];
@@ -262,28 +176,26 @@ class _OrderScreenState extends State<OrderScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${orders.length} order(s) ${_editingBatchId != null ? 'updated' : 'submitted'} successfully!'),
+          content: Text('${orders.length} order(s) submitted successfully!'),
           backgroundColor: Colors.green,
         ),
       );
-      // Reset form if not editing
-      if (_editingBatchId == null) {
-        _formKey.currentState!.reset();
-        _locationController.clear();
-        // Clear quantities
-        for (var controller in _quantityControllers.values) {
-          controller.clear();
-        }
-        setState(() {
-          _orderQuantities.clear();
-          for (var item in _masterItems) {
-            _orderQuantities[item.id!] = 0;
-          }
-          _searchQuery = '';
-          _filteredItems = _masterItems;
-          _inventoryStock.clear();
-        });
+      // Reset form
+      _formKey.currentState!.reset();
+      _locationController.clear();
+      // Clear quantities
+      for (var controller in _quantityControllers.values) {
+        controller.clear();
       }
+      setState(() {
+        _orderQuantities.clear();
+        for (var item in _masterItems) {
+          _orderQuantities[item.id!] = 0;
+        }
+        _searchQuery = '';
+        _filteredItems = _masterItems;
+        _inventoryStock.clear();
+      });
     }
 
     setState(() {
@@ -392,7 +304,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            widget.batchToEdit != null ? 'Edit Order Batch' : 'Create Order',
+                            'Create Order',
                             style: TextStyle(
                               fontSize: 28.0,
                               fontWeight: FontWeight.bold,
@@ -864,7 +776,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                _isLoading ? 'Submitting...' : (widget.batchToEdit != null ? 'Update Order' : 'Submit Order'),
+                                _isLoading ? 'Submitting...' : 'Submit Order',
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

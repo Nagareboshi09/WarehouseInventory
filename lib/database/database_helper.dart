@@ -89,7 +89,6 @@ class DatabaseHelper {
         location TEXT NOT NULL,
         brand TEXT,
         dateAdded TEXT NOT NULL,
-        dateUpdated TEXT,
         branchId INTEGER NOT NULL,
         beg INTEGER,
         prev INTEGER,
@@ -302,7 +301,6 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
-              dateUpdated TEXT,
               branchId INTEGER NOT NULL,
               beg INTEGER,
               prev INTEGER,
@@ -344,7 +342,6 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
-              dateUpdated TEXT,
               branchId INTEGER NOT NULL,
               beg INTEGER,
               prev INTEGER,
@@ -445,31 +442,10 @@ class DatabaseHelper {
       }
     }
     if (oldVersion < 11) {
-      // Add new columns to inventory_items table. Wrap each ALTER in try/catch
-      // so the upgrade is resilient if the column already exists.
-      try {
-        await db.execute('ALTER TABLE inventory_items ADD COLUMN beg INTEGER');
-      } catch (e) {
-        print('Could not add beg column to inventory_items (might already exist): $e');
-      }
-
-      try {
-        await db.execute('ALTER TABLE inventory_items ADD COLUMN prev INTEGER');
-      } catch (e) {
-        print('Could not add prev column to inventory_items (might already exist): $e');
-      }
-
-      try {
-        await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
-      } catch (e) {
-        print('Could not add sales column to inventory_items (might already exist): $e');
-      }
-
-      try {
-        await db.execute('ALTER TABLE inventory_items ADD COLUMN dateUpdated TEXT');
-      } catch (e) {
-        print('Could not add dateUpdated column to inventory_items (might already exist): $e');
-      }
+      // Add beg, prev, sales columns to inventory_items table
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN beg INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN prev INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
     }
   }
 
@@ -673,7 +649,7 @@ class DatabaseHelper {
     final id = await db.insert('master_items', item.toMap());
 
     // Create corresponding inventory item with default quantity 0
-    await db.insert('inventory_items', {
+    final inventoryId = await db.insert('inventory_items', {
       'sku': item.sku,
       'description': item.description,
       'end': 0,
@@ -814,20 +790,9 @@ class DatabaseHelper {
 
   Future<void> updateInventoryItem(InventoryItem item) async {
     final db = await instance.database;
-    final updatedItem = InventoryItem(
-      id: item.id,
-      sku: item.sku,
-      description: item.description,
-      end: item.end,
-      location: item.location,
-      brand: item.brand,
-      dateAdded: item.dateAdded,
-      dateUpdated: DateTime.now(),
-      branchId: item.branchId,
-    );
     await db.update(
       'inventory_items',
-      updatedItem.toMap(),
+      item.toMap(),
       where: 'id = ?',
       whereArgs: [item.id],
     );
@@ -862,16 +827,6 @@ class DatabaseHelper {
       'orders',
       where: 'branchId = ?',
       whereArgs: [branchId],
-    );
-    return result.map((json) => Order.fromMap(json)).toList();
-  }
-
-  Future<List<Order>> getOrdersByBatchId(String batchId) async {
-    final db = await instance.database;
-    final result = await db.query(
-      'orders',
-      where: 'batchId = ?',
-      whereArgs: [batchId],
     );
     return result.map((json) => Order.fromMap(json)).toList();
   }

@@ -54,21 +54,14 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       return;
     }
 
-    final sku = _skuController.text.trim();
     final quantity = int.tryParse(_quantityController.text.trim());
     if (quantity == null || quantity < 0) {
       _showSnackBar('Please enter a valid quantity', Colors.red);
       return;
     }
 
-    // Check for duplicate SKU in the current list
-    if (_masterItems.any((item) => item.sku == sku)) {
-      _showSnackBar('Item with SKU "$sku" already exists in this branch. Please use a different SKU.', Colors.red);
-      return;
-    }
-
     final masterItem = MasterItem(
-      sku: sku,
+      sku: _skuController.text.trim(),
       description: _descriptionController.text.trim(),
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       location: _branchLocationController.text.trim(),
@@ -255,12 +248,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             }
           }
 
-          // Check for duplicate SKU in imported items
-          if (importedItems.any((item) => item.sku == sku)) {
-            _logger.info('Skipping duplicate SKU "$sku" from row $rowIndex');
-            continue;
-          }
-
           // Allow items with null or any numeric quantity (including 0)
           _logger.info('Adding item from row $rowIndex');
 
@@ -284,18 +271,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           return;
         }
 
-        // Filter out duplicates when adding to the list
-        for (var i = 0; i < importedItems.length; i++) {
-          final item = importedItems[i];
-          final quantity = importedQuantities[i];
-
-          if (!_masterItems.any((existing) => existing.sku == item.sku)) {
-            _masterItems.add(item);
-            _masterItemQuantities.add(quantity);
-          }
-        }
-
-        setState(() {});
+        setState(() {
+          _masterItems.addAll(importedItems);
+          _masterItemQuantities.addAll(importedQuantities);
+        });
 
         _showSnackBar('Imported ${importedItems.length} items from Excel', Colors.green);
       }
@@ -326,6 +305,21 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           _showSnackBar('Branch code already exists. Please choose a different code.', Colors.red);
         }
         return;
+      }
+
+      // Check for unique item SKUs within this branch (but allow same SKU in different branches)
+      for (var item in _masterItems) {
+        final existingItem = await db.query(
+          'master_items',
+          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
+          whereArgs: [item.sku, _codeController.text.trim()],
+        );
+        if (existingItem.isNotEmpty) {
+          if (mounted) {
+            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
+          }
+          return;
+        }
       }
 
       await db.transaction((txn) async {
@@ -432,7 +426,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -444,7 +438,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),     
+                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -456,7 +450,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -468,7 +462,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
+                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -482,11 +476,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -628,7 +622,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                             TextFormField(
                               controller: _weeklyReorderPointController,
                               decoration: InputDecoration(
-                                labelText: 'ReOrder Point *',
+                                labelText: 'Weekly ReOrder Point: *',
                                 labelStyle: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
@@ -683,11 +677,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       // Master Items Section
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -764,7 +758,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                     color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                                     ),
                                   ),
                                   padding: const EdgeInsets.all(16),

@@ -25,7 +25,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 10,
+        version: 11,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -43,7 +43,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 10, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 11, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -90,6 +90,9 @@ class DatabaseHelper {
         brand TEXT,
         dateAdded TEXT NOT NULL,
         branchId INTEGER NOT NULL,
+        beg INTEGER,
+        prev INTEGER,
+        sales INTEGER,
         FOREIGN KEY (branchId) REFERENCES branches (id)
       )
     ''');
@@ -299,6 +302,9 @@ class DatabaseHelper {
               brand TEXT,
               dateAdded TEXT NOT NULL,
               branchId INTEGER NOT NULL,
+              beg INTEGER,
+              prev INTEGER,
+              sales INTEGER,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
@@ -337,6 +343,9 @@ class DatabaseHelper {
               brand TEXT,
               dateAdded TEXT NOT NULL,
               branchId INTEGER NOT NULL,
+              beg INTEGER,
+              prev INTEGER,
+              sales INTEGER,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
@@ -431,6 +440,12 @@ class DatabaseHelper {
       } catch (e) {
         print('Could not create unique index on master_items.sku per branch: $e');
       }
+    }
+    if (oldVersion < 11) {
+      // Add beg, prev, sales columns to inventory_items table
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN beg INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN prev INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
     }
   }
 

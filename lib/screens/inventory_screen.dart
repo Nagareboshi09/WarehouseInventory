@@ -240,10 +240,414 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
-    final TextEditingController quantityController = TextEditingController(
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info, color: Colors.white, size: 28),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Current Values',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.qr_code,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'SKU: ${item.sku}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.description,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Description: ${item.description}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.branding_watermark,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Brand: ${item.brand}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Location: ${item.location}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.business,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Branch: ${_selectedBranch?.name ?? 'Unknown'}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.shopping_cart,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Weekly Order Offtake: ${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.warning,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.inventory,
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Maintaining Inventory: ${_selectedBranch?.maintainingInventory ?? 'N/A'}',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Current Values:',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Beg: ${item.beg ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Prev: ${item.prev ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Ending: ${item.end}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Sales: ${item.sales ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Total: ${(item.beg ?? 0) + (item.prev ?? 0)}',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Calculated Values:',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Inventory Offtake: ${(item.beg ?? 0) + (item.prev ?? 0) - item.end}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Weekly Offtake: ${(item.sales ?? 0) / (double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1)}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Reorder Point: ${((item.sales ?? 0) / (double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1)) * (double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0)}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Maintain Qty: ${(item.sales ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory?.toString() ?? '0') ?? 0)}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showUpdateFormDialog(item);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          elevation: 4,
+                          shadowColor: const Color(
+                            0xFF0651A4,
+                          ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                        ),
+                        child: const Text(
+                          'Update',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showUpdateFormDialog(InventoryItem item) async {
+    final TextEditingController begController = TextEditingController();
+    final TextEditingController prevController = TextEditingController();
+    final TextEditingController endingController = TextEditingController(
       text: item.end.toString(),
     );
+    final TextEditingController salesController = TextEditingController();
     bool isLoading = false;
+    int total = 0;
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     await showDialog(
@@ -296,157 +700,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.qr_code,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'SKU: ${item.sku}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.description,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Description: ${item.description}',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.branding_watermark,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Brand: ${item.brand}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Location: ${item.location}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.business,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Branch: ${_selectedBranch?.name ?? 'Unknown'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.shopping_cart,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Weekly Order Offtake: ${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.warning,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.inventory,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Maintaining Inventory: ${_selectedBranch?.maintainingInventory ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
                       decoration: BoxDecoration(
                         color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
@@ -454,23 +707,115 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                         ),
                       ),
-                      child: TextField(
-                        controller: quantityController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'New Quantity',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-                          hintText: 'Enter quantity',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.numbers,
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                          ),
-                        ),
+                      child: StatefulBuilder(
+                        builder: (context, setTableState) {
+                          return Column(
+                            children: [
+                              Table(
+                                columnWidths: const {
+                                  0: FlexColumnWidth(1),
+                                  1: FlexColumnWidth(1),
+                                },
+                                children: [
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: begController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Beg.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: prevController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Prev.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: endingController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Ending',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: salesController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Sales',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Total: $total',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -505,7 +850,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                     });
 
                                     final newQuantity = int.tryParse(
-                                      quantityController.text.trim(),
+                                      endingController.text.trim(),
                                     );
                                     if (newQuantity != null &&
                                         newQuantity >= 0) {
@@ -519,6 +864,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           brand: item.brand,
                                           dateAdded: item.dateAdded,
                                           branchId: item.branchId,
+                                          beg: int.tryParse(begController.text),
+                                          prev: int.tryParse(prevController.text),
+                                          sales: int.tryParse(salesController.text),
                                         );
 
                                         await DatabaseHelper.instance
@@ -571,7 +919,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: const Text(
-                                              'Please enter a valid quantity',
+                                              'Please enter a valid ending quantity',
                                             ),
                                             backgroundColor: Colors.red,
                                             shape: RoundedRectangleBorder(

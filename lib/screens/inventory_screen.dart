@@ -241,6 +241,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Calculate values for display
+    final inventoryOfftake = (item.beg ?? 0) + (item.prev ?? 0) - item.end;
+    final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
+    final weeklyOfftake = (item.sales ?? 0) / weeklyOrderOfftake;
+    final weeklyReorderPoint = double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0;
+    final reorderPoint = weeklyOfftake * weeklyReorderPoint;
+    final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
+    final maintinvty = (item.sales ?? 0) * maintainingInventory;
+
+    // Helper function to format doubles to 2 decimal places if not whole
+    String formatDouble(double value) {
+      return value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(2);
+    }
+
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -547,7 +562,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Weekly Offtake: ${(item.sales ?? 0) / (double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1)}',
+                                'Weekly Offtake: ${formatDouble(weeklyOfftake)}',
                                 style: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
@@ -582,7 +597,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Reorder Point: ${((item.sales ?? 0) / (double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1)) * (double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0)}',
+                                'Reorder Point: ${formatDouble(reorderPoint)}',
                                 style: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
@@ -595,7 +610,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Maintinvty: ${(item.sales ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0)}',
+                                'Maintinvty: ${formatDouble(maintinvty)}',
                                 style: TextStyle(
                                   color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),

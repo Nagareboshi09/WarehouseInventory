@@ -82,7 +82,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
       int totalMaster = masterItems.length;
-      int lowStock = items.where((item) => item.end <= 10).length;
+      int maintainingInventory = int.tryParse(branch.maintainingInventory ?? '10') ?? 10;
+      int lowStockThreshold = maintainingInventory - 1;
+      int lowStock = items.where((item) => item.end <= lowStockThreshold).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
       setState(() {
         _totalMasterItems = totalMaster;

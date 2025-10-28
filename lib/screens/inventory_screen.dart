@@ -1455,7 +1455,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                           vertical: 6,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: item.end <= 10
+                                                      color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                           ? Colors.red
                                                                 .withOpacity(
                                                                   isDarkMode ? 0.3 : 0.1,
@@ -1474,7 +1474,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       style: TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        color: item.end <= 10
+                                                        color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                             ? Colors.red
                                                             : Colors.green,
                                                       ),

@@ -60,8 +60,17 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       return;
     }
 
+    final sku = _skuController.text.trim();
+
+    // Check if SKU already exists in the current list of master items for this branch
+    final existingItem = _masterItems.where((item) => item.sku == sku).isNotEmpty;
+    if (existingItem) {
+      _showSnackBar('SKU "$sku" already exists in this branch. Please use a different SKU.', Colors.red);
+      return;
+    }
+
     final masterItem = MasterItem(
-      sku: _skuController.text.trim(),
+      sku: sku,
       description: _descriptionController.text.trim(),
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
       location: _branchLocationController.text.trim(),
@@ -315,6 +324,21 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           whereArgs: [item.sku, _codeController.text.trim()],
         );
         if (existingItem.isNotEmpty) {
+          if (mounted) {
+            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
+          }
+          return;
+        }
+      }
+
+      // Also check for unique SKUs within the inventory_items table for this branch
+      for (var item in _masterItems) {
+        final existingInventoryItem = await db.query(
+          'inventory_items',
+          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
+          whereArgs: [item.sku, _codeController.text.trim()],
+        );
+        if (existingInventoryItem.isNotEmpty) {
           if (mounted) {
             _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
           }

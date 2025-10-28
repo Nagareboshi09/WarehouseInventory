@@ -850,6 +850,16 @@ class DatabaseHelper {
     );
   }
 
+  Future<bool> checkSkuExistsInBranch(String sku, int branchId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'inventory_items',
+      where: 'sku = ? AND branchId = ?',
+      whereArgs: [sku, branchId],
+    );
+    return result.isNotEmpty;
+  }
+
   Future<void> close() async {
     if (_database != null) {
       await _database!.close();

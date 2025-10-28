@@ -37,14 +37,31 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
     });
 
     try {
+      final sku = _skuController.text.trim();
+      final branchId = widget.selectedBranch.id!;
+
+      // Check if SKU already exists in this branch
+      final skuExists = await DatabaseHelper.instance.checkSkuExistsInBranch(sku, branchId);
+      if (skuExists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('SKU "$sku" already exists in ${widget.selectedBranch.name}. Please use a different SKU.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       final item = InventoryItem(
-        sku: _skuController.text.trim(),
+        sku: sku,
         description: _descriptionController.text.trim(),
         end: int.parse(_quantityController.text.trim()),
         location: _locationController.text.trim(),
         brand: _brandController.text.trim(),
         dateAdded: DateTime.now(),
-        branchId: widget.selectedBranch.id!,
+        branchId: branchId,
       );
 
       await DatabaseHelper.instance.createInventoryItem(item);

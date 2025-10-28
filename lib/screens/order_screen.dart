@@ -25,6 +25,7 @@ class _OrderScreenState extends State<OrderScreen> {
   Map<int, TextEditingController> _quantityControllers = {};
   Map<int, int> _orderQuantities = {};
   Map<String, int> _inventoryStock = {};
+  Map<String, int> _itemSales = {};
   String _searchQuery = '';
   List<MasterItem> _filteredItems = [];
 
@@ -65,16 +66,19 @@ class _OrderScreenState extends State<OrderScreen> {
         _selectedBranch!.id!,
       );
 
-      // Create a map of SKU to stock quantity
+      // Create a map of SKU to stock quantity and sales
       final stockMap = <String, int>{};
+      final salesMap = <String, int>{};
       for (var invItem in inventoryItems) {
         stockMap[invItem.sku] = invItem.end;
+        salesMap[invItem.sku] = invItem.sales ?? 0;
       }
 
       setState(() {
         _masterItems = masterItems;
         _filteredItems = masterItems;
         _inventoryStock = stockMap;
+        _itemSales = salesMap;
         // Initialize controllers for each item
         _quantityControllers.clear();
         _orderQuantities.clear();
@@ -195,6 +199,7 @@ class _OrderScreenState extends State<OrderScreen> {
         _searchQuery = '';
         _filteredItems = _masterItems;
         _inventoryStock.clear();
+        _itemSales.clear();
       });
     }
 
@@ -692,7 +697,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                 ),
                                                                 const SizedBox(height: 2),
                                                                 Text(
-                                                                  '${(_inventoryStock[item.sku] ?? 0) <= 10 ? (20 - (_inventoryStock[item.sku] ?? 0)) : 0}',
+                                                                  '${((_itemSales[item.sku] ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0) - (_inventoryStock[item.sku] ?? 0))}',
                                                                   style: TextStyle(
                                                                     fontSize: 14,
                                                                     fontWeight: FontWeight.bold,

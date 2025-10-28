@@ -510,6 +510,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // Offtake Container
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -520,7 +521,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Calculated Values:',
+                        'Offtake',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                           fontWeight: FontWeight.bold,
@@ -553,7 +554,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Inventory Control Objective Container
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Inventory Control Objective',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
@@ -571,7 +594,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              'Maintain Qty: ${(item.sales ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0)}',
+                              'Maintinvty: ${(item.sales ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0)}',
                               style: TextStyle(
                                 color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                               ),

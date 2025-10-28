@@ -230,7 +230,8 @@ class DatabaseHelper {
           dateOrdered TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'pending',
           batchId TEXT,
-          FOREIGN KEY (branchId) REFERENCES branches (id)
+          FOREIGN KEY (branchId) REFERENCES branches (id),
+          FOREIGN KEY (itemId) REFERENCES master_items (id)
         )
       ''');
     }
@@ -361,7 +362,8 @@ class DatabaseHelper {
               dateOrdered TEXT NOT NULL,
               status TEXT NOT NULL DEFAULT 'pending',
               batchId TEXT,
-              FOREIGN KEY (branchId) REFERENCES branches (id)
+              FOREIGN KEY (branchId) REFERENCES branches (id),
+              FOREIGN KEY (itemId) REFERENCES master_items (id)
             )
           ''');
         }
@@ -467,7 +469,8 @@ class DatabaseHelper {
             dateOrdered TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending',
             batchId TEXT,
-            FOREIGN KEY (branchId) REFERENCES branches (id)
+            FOREIGN KEY (branchId) REFERENCES branches (id),
+            FOREIGN KEY (itemId) REFERENCES master_items (id)
           )
         ''');
       }

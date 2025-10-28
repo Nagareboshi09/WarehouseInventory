@@ -571,7 +571,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              'Maintain Qty: ${(item.sales ?? 0) * 2}',
+                              'Maintain Qty: ${(item.sales ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0)}',
                               style: TextStyle(
                                 color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                               ),

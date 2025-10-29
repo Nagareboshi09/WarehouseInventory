@@ -17,6 +17,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
   late TextEditingController _nameController;
   late TextEditingController _locationController;
   late TextEditingController _codeController;
+  late TextEditingController _weeklyOrderOfftakeController;
+  late TextEditingController _weeklyReorderPointController;
+  late TextEditingController _maintainingInventoryController;
   bool _isLoading = false;
 
   @override
@@ -25,6 +28,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     _nameController = TextEditingController(text: widget.branch.name);
     _locationController = TextEditingController(text: widget.branch.location);
     _codeController = TextEditingController(text: widget.branch.code);
+    _weeklyOrderOfftakeController = TextEditingController(text: widget.branch.weeklyOrderOfftake);
+    _weeklyReorderPointController = TextEditingController(text: widget.branch.weeklyReorderPoint);
+    _maintainingInventoryController = TextEditingController(text: widget.branch.maintainingInventory);
   }
 
   Future<void> _updateBranch() async {
@@ -42,6 +48,15 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
         code: _codeController.text.trim().isEmpty
             ? null
             : _codeController.text.trim(),
+        weeklyOrderOfftake: _weeklyOrderOfftakeController.text.trim().isEmpty
+            ? null
+            : _weeklyOrderOfftakeController.text.trim(),
+        weeklyReorderPoint: _weeklyReorderPointController.text.trim().isEmpty
+            ? null
+            : _weeklyReorderPointController.text.trim(),
+        maintainingInventory: _maintainingInventoryController.text.trim().isEmpty
+            ? null
+            : _maintainingInventoryController.text.trim(),
       );
 
       await DatabaseHelper.instance.updateBranch(updatedBranch);
@@ -49,7 +64,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Branch updated successfully!'),
+            content: Text('Branch updated successfully!!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -135,6 +150,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     _nameController.dispose();
     _locationController.dispose();
     _codeController.dispose();
+    _weeklyOrderOfftakeController.dispose();
+    _weeklyReorderPointController.dispose();
+    _maintainingInventoryController.dispose();
     super.dispose();
   }
 
@@ -366,6 +384,102 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                         ),
                                         prefixIcon: Icon(
                                           Icons.code,
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _weeklyOrderOfftakeController,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Weekly Order Offtake',
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.shopping_cart,
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _weeklyReorderPointController,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Weekly ReOrder Point',
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.warning,
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 12,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(15),
+                                      border: Border.all(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: TextFormField(
+                                      controller: _maintainingInventoryController,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: 'Maintaining Inventory',
+                                        labelStyle: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        ),
+                                        prefixIcon: Icon(
+                                          Icons.inventory,
                                           color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,

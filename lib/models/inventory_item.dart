@@ -7,6 +7,9 @@ class InventoryItem {
   final String? brand;
   final DateTime dateAdded;
   final int branchId;
+  final int? beg;
+  final int? prev;
+  final int? sales;
 
   InventoryItem({
     this.id,
@@ -17,6 +20,9 @@ class InventoryItem {
     this.brand,
     required this.dateAdded,
     required this.branchId,
+    this.beg,
+    this.prev,
+    this.sales,
   });
 
   factory InventoryItem.fromMap(Map<String, dynamic> map) {
@@ -29,6 +35,9 @@ class InventoryItem {
       brand: map['brand'],
       dateAdded: DateTime.parse(map['dateAdded']),
       branchId: map['branchId'],
+      beg: map['beg'],
+      prev: map['prev'],
+      sales: map['sales'],
     );
   }
 
@@ -42,6 +51,9 @@ class InventoryItem {
       'brand': brand,
       'dateAdded': dateAdded.toIso8601String(),
       'branchId': branchId,
+      'beg': beg,
+      'prev': prev,
+      'sales': sales,
     };
   }
 }

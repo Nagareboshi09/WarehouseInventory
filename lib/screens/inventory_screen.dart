@@ -5,6 +5,8 @@ import 'package:warehouse_inventory/models/branch.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_inventory_item_screen.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch});
@@ -149,11 +151,543 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+  Future<void> _exportInventoryToFile() async {
+    if (_selectedBranch == null || _inventoryItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No inventory data to export'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Try different storage locations for better compatibility
+      Directory? directory;
+
+      // Try external storage first (Android)
+      try {
+        directory = await getExternalStorageDirectory();
+        if (directory != null) {
+          final downloadDir = Directory('${directory.path}/Download');
+          if (!await downloadDir.exists()) {
+            await downloadDir.create(recursive: true);
+          }
+          directory = downloadDir;
+        }
+      } catch (e) {
+        // Fallback to application documents directory
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      if (directory == null) {
+        throw Exception('Unable to access storage directory');
+      }
+
+      final fileName = '${_selectedBranch!.name.replaceAll(' ', '_')}_inventory_${DateTime.now().toIso8601String().split('T')[0]}.csv';
+      final file = File('${directory.path}/$fileName');
+
+      // Create CSV header
+      String csvContent = 'SKU,Description,Brand,Location,Quantity,Date Added\n';
+
+      // Add inventory items
+      for (var item in _inventoryItems) {
+        final brand = item.brand ?? 'N/A';
+        final dateAdded = '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+        csvContent += '${item.sku},"${item.description}",$brand,${item.location},${item.end},$dateAdded\n';
+      }
+
+      await file.writeAsString(csvContent);
+
+      final filePath = '${directory.path}/$fileName';
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Inventory exported successfully!\nFile: $fileName\nLocation: ${directory.path}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Show Path',
+              textColor: Colors.white,
+              onPressed: () async {
+                // Show the file path in another snackbar
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('File location: $filePath\nUse your file manager to navigate to this path and open the CSV file.'),
+                      backgroundColor: Colors.blue,
+                      duration: const Duration(seconds: 15),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting inventory: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
-    final TextEditingController quantityController = TextEditingController(
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Calculate values for display
+    final inventoryOfftake = (item.beg ?? 0) + (item.prev ?? 0) - item.end;
+    final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
+    final weeklyOfftake = (item.sales ?? 0) / weeklyOrderOfftake;
+    final weeklyReorderPoint = double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0;
+    final reorderPoint = weeklyOfftake * weeklyReorderPoint;
+    final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
+    final maintinvty = (item.sales ?? 0) * maintainingInventory;
+
+    // Helper function to format doubles to 2 decimal places if not whole
+    String formatDouble(double value) {
+      return value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(2);
+    }
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info, color: Colors.white, size: 28),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Current Values',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.qr_code,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'SKU: ${item.sku}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.description,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Description: ${item.description}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.branding_watermark,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Brand: ${item.brand}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Location: ${item.location}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.business,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Branch: ${_selectedBranch?.name ?? 'Unknown'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.shopping_cart,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Weekly Order Offtake: ${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.warning,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.inventory,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Maintaining Inventory: ${_selectedBranch?.maintainingInventory ?? 'N/A'}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Current Values:',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Beg: ${item.beg ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Prev: ${item.prev ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Ending: ${item.end}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Sales: ${item.sales ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: ${(item.beg ?? 0) + (item.prev ?? 0)}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Offtake Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Offtake',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Inventory Offtake: ${(item.beg ?? 0) + (item.prev ?? 0) - item.end}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Weekly Offtake: ${formatDouble(weeklyOfftake)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Inventory Control Objective Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inventory Control Objective',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Reorder Point: ${formatDouble(reorderPoint)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Maintinvty: ${formatDouble(maintinvty)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showUpdateFormDialog(item);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            elevation: 4,
+                            shadowColor: const Color(
+                              0xFF0651A4,
+                            ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                          ),
+                          child: const Text(
+                            'Update',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showUpdateFormDialog(InventoryItem item) async {
+    final TextEditingController begController = TextEditingController();
+    final TextEditingController prevController = TextEditingController();
+    final TextEditingController endingController = TextEditingController(
       text: item.end.toString(),
     );
+    final TextEditingController salesController = TextEditingController();
     bool isLoading = false;
+    int total = 0;
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     await showDialog(
@@ -206,89 +740,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.qr_code,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'SKU: ${item.sku}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.description,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Description: ${item.description}',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.branding_watermark,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Brand: ${item.brand}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Location: ${item.location}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
                       decoration: BoxDecoration(
                         color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
@@ -296,23 +747,115 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
                         ),
                       ),
-                      child: TextField(
-                        controller: quantityController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'New Quantity',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-                          hintText: 'Enter quantity',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.numbers,
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                          ),
-                        ),
+                      child: StatefulBuilder(
+                        builder: (context, setTableState) {
+                          return Column(
+                            children: [
+                              Table(
+                                columnWidths: const {
+                                  0: FlexColumnWidth(1),
+                                  1: FlexColumnWidth(1),
+                                },
+                                children: [
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: begController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Beg.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: prevController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Prev.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: endingController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Ending',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: salesController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Sales',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Total: $total',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -346,64 +889,95 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       isLoading = true;
                                     });
 
-                                    final newQuantity = int.tryParse(
-                                      quantityController.text.trim(),
-                                    );
-                                    if (newQuantity != null &&
-                                        newQuantity >= 0) {
-                                      try {
-                                        final updatedItem = InventoryItem(
-                                          id: item.id,
-                                          sku: item.sku,
-                                          description: item.description,
-                                          end: newQuantity,
-                                          location: item.location,
-                                          brand: item.brand,
-                                          dateAdded: item.dateAdded,
-                                          branchId: item.branchId,
-                                        );
+                                    final newBeg = int.tryParse(begController.text) ?? 0;
+                                    final newPrev = int.tryParse(prevController.text) ?? 0;
+                                    final newEnding = int.tryParse(endingController.text.trim());
+                                    final newSales = int.tryParse(salesController.text) ?? 0;
 
-                                        await DatabaseHelper.instance
-                                            .updateInventoryItem(updatedItem);
+                                    if (newEnding != null && newEnding >= 0) {
+                                      // Calculate the values that should not be negative
+                                      final inventoryOfftake = newBeg + newPrev - newEnding;
+                                      final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
+                                      final weeklyOfftake = newSales / weeklyOrderOfftake;
+                                      final weeklyReorderPoint = double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0;
+                                      final reorderPoint = weeklyOfftake * weeklyReorderPoint;
+                                      final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
+                                      final maintinvty = newSales * maintainingInventory;
 
+                                      // Check if any calculated values would be negative
+                                      if (inventoryOfftake < 0 || weeklyOfftake < 0 || reorderPoint < 0 || maintinvty < 0) {
                                         if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
+                                          ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(
                                               content: const Text(
-                                                'Quantity updated successfully!',
-                                              ),
-                                              backgroundColor: Colors.green,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ),
-                                          );
-                                          Navigator.of(context).pop();
-                                          _loadInventoryItems(); // Refresh the list
-                                        }
-                                      } catch (e) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Error updating quantity: ${e.toString()}',
+                                                'Update would result in negative inventory values. Please adjust the inputs.',
                                               ),
                                               backgroundColor: Colors.red,
                                               shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
+                                                borderRadius: BorderRadius.circular(15),
                                               ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
+                                              behavior: SnackBarBehavior.floating,
                                             ),
                                           );
+                                        }
+                                      } else {
+                                        try {
+                                          final updatedItem = InventoryItem(
+                                            id: item.id,
+                                            sku: item.sku,
+                                            description: item.description,
+                                            end: newEnding,
+                                            location: item.location,
+                                            brand: item.brand,
+                                            dateAdded: item.dateAdded,
+                                            branchId: item.branchId,
+                                            beg: newBeg == 0 ? null : newBeg,
+                                            prev: newPrev == 0 ? null : newPrev,
+                                            sales: newSales == 0 ? null : newSales,
+                                          );
+
+                                          await DatabaseHelper.instance
+                                              .updateInventoryItem(updatedItem);
+
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: const Text(
+                                                  'Quantity updated successfully!',
+                                                ),
+                                                backgroundColor: Colors.green,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                            Navigator.of(context).pop();
+                                            _loadInventoryItems(); // Refresh the list
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error updating quantity: ${e.toString()}',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
                                         }
                                       }
                                     } else {
@@ -413,7 +987,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: const Text(
-                                              'Please enter a valid quantity',
+                                              'Please enter a valid ending quantity',
                                             ),
                                             backgroundColor: Colors.red,
                                             shape: RoundedRectangleBorder(
@@ -751,6 +1325,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         child: Text('SKU'),
                                       ),
                                       DropdownMenuItem(
+                                        value: 'brand',
+                                        child: Text('Brand'),
+                                      ),
+                                      DropdownMenuItem(
                                         value: 'branch',
                                         child: Text('Branch'),
                                       ),
@@ -782,6 +1360,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                   item.dateAdded
                                                       .toIso8601String()
                                                       .contains(filterValue);
+                                            case 'brand':
+                                              return (item.brand ?? '')
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
                                             case 'branch':
                                               return _selectedBranch?.name
                                                       .toLowerCase()
@@ -871,7 +1455,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                           vertical: 6,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: item.end <= 10
+                                                      color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                           ? Colors.red
                                                                 .withOpacity(
                                                                   isDarkMode ? 0.3 : 0.1,
@@ -890,7 +1474,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       style: TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        color: item.end <= 10
+                                                        color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                             ? Colors.red
                                                             : Colors.green,
                                                       ),

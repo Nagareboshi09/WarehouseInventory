@@ -20,19 +20,22 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    
+
     if (kIsWeb) {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 8,
+        version: 11,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
     } else {
       _database = await _initDB('warehouse_inventory.db');
     }
-    
+
+    // Ensure orders table exists
+    await _ensureOrdersTableExists();
+
     return _database!;
   }
 
@@ -40,7 +43,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 8, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 11, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -58,7 +61,10 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         location TEXT NOT NULL,
-        code TEXT
+        code TEXT UNIQUE,
+        weeklyOrderOfftake TEXT,
+        weeklyReorderPoint TEXT,
+        maintainingInventory TEXT
       )
     ''');
 
@@ -84,6 +90,24 @@ class DatabaseHelper {
         brand TEXT,
         dateAdded TEXT NOT NULL,
         branchId INTEGER NOT NULL,
+        beg INTEGER,
+        prev INTEGER,
+        sales INTEGER,
+        FOREIGN KEY (branchId) REFERENCES branches (id)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE orders(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        branchId INTEGER NOT NULL,
+        location TEXT NOT NULL,
+        brand TEXT NOT NULL,
+        itemId INTEGER NOT NULL,
+        quantity INTEGER NOT NULL,
+        dateOrdered TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        batchId TEXT,
         FOREIGN KEY (branchId) REFERENCES branches (id)
       )
     ''');
@@ -196,7 +220,7 @@ class DatabaseHelper {
     if (oldVersion < 6) {
       // Add orders table
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
+        CREATE TABLE orders(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           branchId INTEGER NOT NULL,
           location TEXT NOT NULL,
@@ -206,36 +230,20 @@ class DatabaseHelper {
           dateOrdered TEXT NOT NULL,
           status TEXT NOT NULL DEFAULT 'pending',
           batchId TEXT,
-          FOREIGN KEY (branchId) REFERENCES branches (id)
-        )
-      ''');
-    }
-    if (oldVersion < 8) {
-      // Add orders table
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS orders(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          branchId INTEGER NOT NULL,
-          location TEXT NOT NULL,
-          brand TEXT NOT NULL,
-          itemId INTEGER NOT NULL,
-          quantity INTEGER NOT NULL,
-          dateOrdered TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending',
-          batchId TEXT,
-          FOREIGN KEY (branchId) REFERENCES branches (id)
+          FOREIGN KEY (branchId) REFERENCES branches (id),
+          FOREIGN KEY (itemId) REFERENCES master_items (id)
         )
       ''');
     }
     if (oldVersion < 7) {
       // Force recreate master_items and inventory_items tables to fix schema issues
-      
+
       // Fix master_items table
       final masterTableInfo = await db.rawQuery("PRAGMA table_info(master_items)");
       final hasMasterLegacyColumns = masterTableInfo.any((column) =>
         column['name'] == 'itemClassCode' || column['name'] == 'itemClass'
       );
-      
+
       if (hasMasterLegacyColumns || masterTableInfo.isEmpty) {
         try {
           await db.execute('''
@@ -249,7 +257,7 @@ class DatabaseHelper {
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-          
+
           try {
             await db.execute('''
               INSERT INTO master_items_new (id, sku, description, location, brand, branchId)
@@ -258,7 +266,7 @@ class DatabaseHelper {
           } catch (e) {
             print('Could not copy master_items data: $e');
           }
-          
+
           await db.execute('DROP TABLE IF EXISTS master_items');
           await db.execute('ALTER TABLE master_items_new RENAME TO master_items');
         } catch (e) {
@@ -272,16 +280,17 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               branchId INTEGER NOT NULL,
-              FOREIGN KEY (branchId) REFERENCES branches (id)
+              FOREIGN KEY (branchId) REFERENCES branches (id),
+              UNIQUE(sku, branchId)
             )
           ''');
         }
       }
-      
+
       // Fix inventory_items table
       final invTableInfo = await db.rawQuery("PRAGMA table_info(inventory_items)");
       final hasEndColumn = invTableInfo.any((column) => column['name'] == 'end');
-      
+
       if (!hasEndColumn || invTableInfo.isEmpty) {
         try {
           await db.execute('''
@@ -294,10 +303,13 @@ class DatabaseHelper {
               brand TEXT,
               dateAdded TEXT NOT NULL,
               branchId INTEGER NOT NULL,
+              beg INTEGER,
+              prev INTEGER,
+              sales INTEGER,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-          
+
           try {
             // Try to copy with 'end' column if it exists
             await db.execute('''
@@ -316,7 +328,7 @@ class DatabaseHelper {
               print('Could not copy inventory_items data: $e2');
             }
           }
-          
+
           await db.execute('DROP TABLE IF EXISTS inventory_items');
           await db.execute('ALTER TABLE inventory_items_new RENAME TO inventory_items');
         } catch (e) {
@@ -332,12 +344,15 @@ class DatabaseHelper {
               brand TEXT,
               dateAdded TEXT NOT NULL,
               branchId INTEGER NOT NULL,
+              beg INTEGER,
+              prev INTEGER,
+              sales INTEGER,
               FOREIGN KEY (branchId) REFERENCES branches (id)
             )
           ''');
-      
+
           await db.execute('''
-            CREATE TABLE orders(
+            CREATE TABLE IF NOT EXISTS orders(
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               branchId INTEGER NOT NULL,
               location TEXT NOT NULL,
@@ -347,11 +362,120 @@ class DatabaseHelper {
               dateOrdered TEXT NOT NULL,
               status TEXT NOT NULL DEFAULT 'pending',
               batchId TEXT,
-              FOREIGN KEY (branchId) REFERENCES branches (id)
+              FOREIGN KEY (branchId) REFERENCES branches (id),
+              FOREIGN KEY (itemId) REFERENCES master_items (id)
             )
           ''');
         }
       }
+    }
+    if (oldVersion < 9) {
+      // Add new columns for inventory management
+      await db.execute('ALTER TABLE branches ADD COLUMN weeklyOrderOfftake TEXT');
+      await db.execute('ALTER TABLE branches ADD COLUMN weeklyReorderPoint TEXT');
+      await db.execute('ALTER TABLE branches ADD COLUMN maintainingInventory TEXT');
+    }
+    if (oldVersion < 10) {
+      // Add unique constraints for branch codes and item SKUs
+      // First, handle potential duplicates by updating them to null or appending suffix
+      try {
+        // For branches with duplicate codes, keep the first one and set others to null
+        final duplicateBranches = await db.rawQuery('''
+          SELECT code, COUNT(*) as count
+          FROM branches
+          WHERE code IS NOT NULL
+          GROUP BY code
+          HAVING count > 1
+        ''');
+
+        for (var row in duplicateBranches) {
+          final code = row['code'];
+          // Update all but the first occurrence to have null code
+          await db.rawUpdate('''
+            UPDATE branches
+            SET code = NULL
+            WHERE code = ? AND id NOT IN (
+              SELECT MIN(id) FROM branches WHERE code = ?
+            )
+          ''', [code, code]);
+        }
+
+        await db.execute('CREATE UNIQUE INDEX idx_branches_code ON branches(code)');
+      } catch (e) {
+        print('Could not create unique index on branches.code: $e');
+      }
+
+      try {
+        // For master_items with duplicate SKUs within the same branch, keep the first one and append suffix to others
+        final duplicateItems = await db.rawQuery('''
+          SELECT sku, branchId, COUNT(*) as count
+          FROM master_items
+          GROUP BY sku, branchId
+          HAVING count > 1
+        ''');
+
+        for (var row in duplicateItems) {
+          final sku = row['sku'];
+          final branchId = row['branchId'];
+          // Get all items with this SKU in this branch except the first one
+          final duplicateRows = await db.rawQuery('''
+            SELECT id FROM master_items
+            WHERE sku = ? AND branchId = ?
+            ORDER BY id
+            LIMIT -1 OFFSET 1
+          ''', [sku, branchId]);
+
+          int suffix = 1;
+          for (var dupRow in duplicateRows) {
+            final newSku = '${sku}_dup_$suffix';
+            await db.update(
+              'master_items',
+              {'sku': newSku},
+              where: 'id = ?',
+              whereArgs: [dupRow['id']],
+            );
+            suffix++;
+          }
+        }
+
+        await db.execute('CREATE UNIQUE INDEX idx_master_items_sku_branch ON master_items(sku, branchId)');
+      } catch (e) {
+        print('Could not create unique index on master_items.sku per branch: $e');
+      }
+    }
+    if (oldVersion < 11) {
+      // Add beg, prev, sales columns to inventory_items table
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN beg INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN prev INTEGER');
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
+    }
+  }
+
+  Future<void> _ensureOrdersTableExists() async {
+    final db = await database;
+    try {
+      // Check if orders table exists
+      final result = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'");
+      if (result.isEmpty) {
+        // Create orders table if it doesn't exist
+        await db.execute('''
+          CREATE TABLE orders(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            branchId INTEGER NOT NULL,
+            location TEXT NOT NULL,
+            brand TEXT NOT NULL,
+            itemId INTEGER NOT NULL,
+            quantity INTEGER NOT NULL,
+            dateOrdered TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            batchId TEXT,
+            FOREIGN KEY (branchId) REFERENCES branches (id),
+            FOREIGN KEY (itemId) REFERENCES master_items (id)
+          )
+        ''');
+      }
+    } catch (e) {
+      print('Error ensuring orders table exists: $e');
     }
   }
 
@@ -727,6 +851,16 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<bool> checkSkuExistsInBranch(String sku, int branchId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'inventory_items',
+      where: 'sku = ? AND branchId = ?',
+      whereArgs: [sku, branchId],
+    );
+    return result.isNotEmpty;
   }
 
   Future<void> close() async {

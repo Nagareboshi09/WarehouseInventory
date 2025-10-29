@@ -896,12 +896,35 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       isLoading = true;
                                     });
 
-                                    final newBeg = int.tryParse(begController.text) ?? 0;
-                                    final newPrev = int.tryParse(prevController.text) ?? 0;
-                                    final newEnding = int.tryParse(endingController.text.trim());
-                                    final newSales = int.tryParse(salesController.text) ?? 0;
+                                    // Validate that all fields are not empty
+                                    if (begController.text.trim().isEmpty ||
+                                        prevController.text.trim().isEmpty ||
+                                        endingController.text.trim().isEmpty ||
+                                        salesController.text.trim().isEmpty) {
+                                      if (mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return AlertDialog(
+                                              title: Text('Error'),
+                                              content: Text('All fields (Beginning, Previous, Ending, Sales) must be filled. Please enter 0 if no value.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(context).pop(),
+                                                  child: Text('OK'),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      }
+                                    } else {
+                                      final newBeg = int.tryParse(begController.text) ?? 0;
+                                      final newPrev = int.tryParse(prevController.text) ?? 0;
+                                      final newEnding = int.tryParse(endingController.text.trim());
+                                      final newSales = int.tryParse(salesController.text) ?? 0;
 
-                                    if (newEnding != null && newEnding >= 0) {
+                                      if (newEnding != null && newEnding >= 0) {
                                       // Calculate the values that should not be negative
                                       final inventoryOfftake = newBeg + newPrev - newEnding;
                                       final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
@@ -914,17 +937,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       // Check if any calculated values would be negative
                                       if (inventoryOfftake < 0 || weeklyOfftake < 0 || reorderPoint < 0 || maintinvty < 0) {
                                         if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: const Text(
-                                                'Update would result in negative inventory values. Please adjust the inputs.',
-                                              ),
-                                              backgroundColor: Colors.red,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(15),
-                                              ),
-                                              behavior: SnackBarBehavior.floating,
-                                            ),
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title: Text('Error'),
+                                                content: Text('Update would result in negative inventory values. Please adjust the inputs.'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    child: Text('OK'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
                                           );
                                         }
                                       } else {
@@ -987,29 +1013,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                           }
                                         }
                                       }
-                                    } else {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: const Text(
-                                              'Please enter a valid ending quantity',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
+                                      } else {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: const Text(
+                                                'Please enter a valid ending quantity',
+                                              ),
+                                              backgroundColor: Colors.red,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
                                                   BorderRadius.circular(15),
+                                              ),
+                                              behavior: SnackBarBehavior.floating,
                                             ),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
+                                          );
+                                        }
                                       }
-                                    }
-
-                                    setDialogState(() {
-                                      isLoading = false;
-                                    });
+                                      }
+ 
+                                      setDialogState(() {
+                                        isLoading = false;
+                                      });
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),

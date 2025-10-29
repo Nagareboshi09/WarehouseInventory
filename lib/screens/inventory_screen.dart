@@ -9,9 +9,10 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, this.initialBranch});
+  const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
 
   final Branch? initialBranch;
+  final bool showLowStockOnly;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -104,9 +105,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
         _selectedBranch!.id!,
       );
       if (mounted) {
+        List<InventoryItem> filteredItems = items;
+        if (widget.showLowStockOnly) {
+          final maintainingInventory = int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10;
+          final lowStockThreshold = maintainingInventory - 1;
+          filteredItems = items.where((item) => item.end <= lowStockThreshold).toList();
+        }
         setState(() {
           _inventoryItems = items;
-          _filteredItems = items;
+          _filteredItems = filteredItems;
           _isLoading = false;
           _branchSelected = true;
         });
@@ -1254,7 +1261,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '${_selectedBranch?.name} Inventory',
+                                            widget.showLowStockOnly ? 'Low Stock Items' : '${_selectedBranch?.name} Inventory',
                                             style: const TextStyle(
                                               fontSize: 20,
                                               fontWeight: FontWeight.bold,

@@ -257,6 +257,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             }
           }
 
+          // Check if SKU already exists in the imported items list
+          if (importedItems.any((item) => item.sku == sku)) {
+            _logger.info('Skipping duplicate SKU "$sku" in import from row $rowIndex');
+            continue;
+          }
+
           // Allow items with null or any numeric quantity (including 0)
           _logger.info('Adding item from row $rowIndex');
 

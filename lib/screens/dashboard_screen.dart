@@ -242,7 +242,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         Colors.orange.shade400,
                                         () => Navigator.push(
                                           context,
-                                          MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                                          MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch, showLowStockOnly: true)),
                                         ),
                                       ),
                                     ],

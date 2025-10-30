@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:warehouse_inventory/database/database_helper.dart';
 import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/models/inventory_item.dart';
 import 'package:warehouse_inventory/models/master_item.dart';
 import 'package:warehouse_inventory/models/order.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
@@ -20,7 +21,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _totalMasterItems = 0;
   int _totalInventoryQuantity = 0;
   int _lowStockItems = 0;
+  int _totalOrders = 0;
   List<Order> _orders = [];
+  List<InventoryItem> _inventoryItems = [];
   bool _isLoading = true;
 
   @override
@@ -56,13 +59,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         final allMasterItems = await DatabaseHelper.instance.getAllMasterItems();
         final allInventoryItems = await DatabaseHelper.instance.getAllInventoryItems();
+        final allOrders = await DatabaseHelper.instance.getAllOrders();
         int totalMaster = allMasterItems.length;
         int totalInventoryQuantity = allInventoryItems.fold(0, (sum, item) => sum + item.end);
         int lowStock = allInventoryItems.where((item) => item.end <= 10).length;
+        int totalOrders = allOrders.length;
         setState(() {
           _totalMasterItems = totalMaster;
           _totalInventoryQuantity = totalInventoryQuantity;
           _lowStockItems = lowStock;
+          _totalOrders = totalOrders;
+          _inventoryItems = allInventoryItems;
+          _orders = allOrders;
           _isLoading = false;
         });
       } catch (e) {
@@ -81,16 +89,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
       final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
+      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
       int totalMaster = masterItems.length;
       int maintainingInventory = int.tryParse(branch.maintainingInventory ?? '10') ?? 10;
       int lowStockThreshold = maintainingInventory - 1;
       int lowStock = items.where((item) => item.end <= lowStockThreshold).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
+      int totalOrders = orders.length;
       setState(() {
         _totalMasterItems = totalMaster;
         _totalInventoryQuantity = totalInventoryQuantity;
         _lowStockItems = lowStock;
-        _orders = [];
+        _totalOrders = totalOrders;
+        _inventoryItems = items;
+        _orders = orders;
         _isLoading = false;
       });
     } catch (e) {
@@ -115,6 +127,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Container(
+              height: MediaQuery.of(context).size.height,
+              width: MediaQuery.of(context).size.width,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -178,126 +192,139 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                            decoration: BoxDecoration(
-                              color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
-                            child: DropdownButton<Branch>(
-                              value: _selectedBranch,
-                              hint: Text('Select Branch', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54)),
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                              dropdownColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-                              items: _branches.map((Branch branch) {
-                                return DropdownMenuItem<Branch>(
-                                  value: branch,
-                                  child: Text('${branch.name} (${branch.location})', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
-                                );
-                              }).toList(),
-                              onChanged: (Branch? newBranch) {
-                                if (newBranch != null) {
-                                  setState(() {
-                                    _selectedBranch = newBranch;
-                                  });
-                                  _loadDataForBranch(newBranch);
-                                } else {
-                                  setState(() {
-                                    _selectedBranch = null;
-                                  });
-                                  _loadAllData();
-                                }
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 24.0),
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.topCenter,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildAnimatedInfoCard(
-                                        'Total Items',
-                                        _totalMasterItems.toString(),
-                                        Icons.inventory,
-                                        Colors.blue.shade400,
-                                        () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => const MasterDataScreen()),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16.0),
-                                      _buildAnimatedInfoCard(
-                                        'Low Stock Items',
-                                        _lowStockItems.toString(),
-                                        Icons.warning,
-                                        Colors.orange.shade400,
-                                        () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch, showLowStockOnly: true)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24.0),
-                                  if (_orders.isNotEmpty) ...[
-                                    Text(
-                                      'Ordered Products',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8.0),
-                                    Container(
-                                      constraints: const BoxConstraints(maxHeight: 200),
-                                      child: ListView.builder(
-                                        shrinkWrap: true,
-                                        itemCount: _orders.length,
-                                        itemBuilder: (context, index) {
-                                          final order = _orders[index];
-                                          return Card(
-                                            margin: const EdgeInsets.symmetric(vertical: 4.0),
-                                            child: ListTile(
-                                              leading: Icon(
-                                                Icons.shopping_cart,
-                                                color: Colors.green.shade600,
-                                              ),
-                                              title: Text('${order.brand} - Item ${order.itemId}'),
-                                              subtitle: Text('Quantity: ${order.quantity} • Status: ${order.status}'),
-                                              trailing: Text(
-                                                '${order.dateOrdered.day}/${order.dateOrdered.month}/${order.dateOrdered.year}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade600,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    Text(
-                                      'No orders for this branch',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                              child: DropdownButton<Branch>(
+                                value: _selectedBranch,
+                                hint: Text('Select Branch', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black54)),
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                dropdownColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
+                                items: _branches.map((Branch branch) {
+                                  return DropdownMenuItem<Branch>(
+                                    value: branch,
+                                    child: Text('${branch.name} (${branch.location})', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+                                  );
+                                }).toList(),
+                                onChanged: (Branch? newBranch) {
+                                  if (newBranch != null) {
+                                    setState(() {
+                                      _selectedBranch = newBranch;
+                                    });
+                                    _loadDataForBranch(newBranch);
+                                  } else {
+                                    setState(() {
+                                      _selectedBranch = null;
+                                    });
+                                    _loadAllData();
+                                  }
+                                },
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 24.0),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildAnimatedInfoCard(
+                                  'Total Items',
+                                  _totalMasterItems.toString(),
+                                  Icons.inventory,
+                                  Colors.blue.shade400,
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const MasterDataScreen()),
+                                  ),
+                                ),
+                                const SizedBox(width: 16.0),
+                                _buildAnimatedInfoCard(
+                                  'Total Inventory',
+                                  _totalInventoryQuantity.toString(),
+                                  Icons.storage,
+                                  Colors.green.shade400,
+                                  null,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24.0),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildAnimatedInfoCard(
+                                  'Total Orders',
+                                  _totalOrders.toString(),
+                                  Icons.shopping_cart,
+                                  Colors.purple.shade400,
+                                  null,
+                                ),
+                                const SizedBox(width: 16.0),
+                                _buildAnimatedInfoCard(
+                                  'Low Stock Items',
+                                  _lowStockItems.toString(),
+                                  Icons.warning,
+                                  Colors.orange.shade400,
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch, showLowStockOnly: true)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24.0),
+                            if (_orders.isNotEmpty) ...[
+                              Text(
+                                'Ordered Products',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8.0),
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 200),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: _orders.length,
+                                  itemBuilder: (context, index) {
+                                    final order = _orders[index];
+                                    return Card(
+                                      margin: const EdgeInsets.symmetric(vertical: 4.0),
+                                      child: ListTile(
+                                        leading: Icon(
+                                          Icons.shopping_cart,
+                                          color: Colors.green.shade600,
+                                        ),
+                                        title: Text('${order.brand} - Item ${order.itemId}'),
+                                        subtitle: Text('Quantity: ${order.quantity} • Status: ${order.status}'),
+                                        trailing: Text(
+                                          '${order.dateOrdered.day}/${order.dateOrdered.month}/${order.dateOrdered.year}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ] else ...[
+                              Text(
+                                'No orders for this branch',
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),

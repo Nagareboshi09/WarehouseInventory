@@ -25,7 +25,7 @@ class DatabaseHelper {
       // Use in-memory database for web
       _database = await openDatabase(
         inMemoryDatabasePath,
-        version: 11,
+        version: 12,
         onCreate: _createDB,
         onUpgrade: _upgradeDB,
       );
@@ -43,7 +43,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 11, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 12, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -89,6 +89,7 @@ class DatabaseHelper {
         location TEXT NOT NULL,
         brand TEXT,
         dateAdded TEXT NOT NULL,
+        lastUpdated TEXT,
         branchId INTEGER NOT NULL,
         beg INTEGER,
         prev INTEGER,
@@ -302,6 +303,7 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
+              lastUpdated TEXT,
               branchId INTEGER NOT NULL,
               beg INTEGER,
               prev INTEGER,
@@ -343,6 +345,7 @@ class DatabaseHelper {
               location TEXT NOT NULL,
               brand TEXT,
               dateAdded TEXT NOT NULL,
+              lastUpdated TEXT,
               branchId INTEGER NOT NULL,
               beg INTEGER,
               prev INTEGER,
@@ -448,6 +451,10 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE inventory_items ADD COLUMN beg INTEGER');
       await db.execute('ALTER TABLE inventory_items ADD COLUMN prev INTEGER');
       await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
+    }
+    if (oldVersion < 12) {
+      // Add lastUpdated column to inventory_items table
+      await db.execute('ALTER TABLE inventory_items ADD COLUMN lastUpdated TEXT');
     }
   }
 
@@ -793,9 +800,10 @@ class DatabaseHelper {
 
   Future<void> updateInventoryItem(InventoryItem item) async {
     final db = await instance.database;
+    final updatedItem = item.copyWith(lastUpdated: DateTime.now());
     await db.update(
       'inventory_items',
-      item.toMap(),
+      updatedItem.toMap(),
       where: 'id = ?',
       whereArgs: [item.id],
     );

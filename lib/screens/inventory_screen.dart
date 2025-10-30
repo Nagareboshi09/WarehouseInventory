@@ -7,6 +7,7 @@ import 'add_inventory_item_screen.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
@@ -367,6 +368,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             const SizedBox(width: 8),
                             Text(
                               'Brand: ${item.brand}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.update,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Last Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(item.lastUpdated!.toLocal()) : 'Never'}',
                               style: TextStyle(
                                 color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                               ),
@@ -1477,7 +1495,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     ),
                                                   ),
                                                   subtitle: Text(
-                                                    'SKU: ${item.sku} | Brand: ${item.brand}',
+                                                    'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(item.lastUpdated!.toLocal()) : 'Never'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),

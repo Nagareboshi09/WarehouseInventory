@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_branch_screen.dart';
 import 'edit_branch_screen.dart';
@@ -29,7 +28,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
     });
 
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
 
       if (mounted) {
         setState(() {
@@ -79,7 +78,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -91,7 +90,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -103,7 +102,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -115,7 +114,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -148,7 +147,7 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -162,11 +161,11 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                        color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                            color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -322,13 +321,13 @@ class _MasterDataScreenState extends State<MasterDataScreen> {
                                                 color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                                ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                        ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.business,
                                                       color: Color(0xFF0651A4),

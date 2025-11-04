@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
+import 'package:drift/drift.dart' hide Column;
 
 class EditMasterItemScreen extends StatefulWidget {
   final Branch branch;
@@ -32,7 +31,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
 
   Future<void> _loadMasterItems() async {
     try {
-      final items = await DatabaseHelper.instance.getMasterItemsByBranch(widget.branch.id!);
+      final items = await AppDatabase.instance.getMasterItemsByBranch(widget.branch.id!);
       if (mounted) {
         setState(() {
           _masterItems = items;
@@ -44,7 +43,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading master items: \$e')),
+        SnackBar(content: Text('Error loading master items: $e')),
       );
     }
   }
@@ -109,10 +108,10 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
                   sku: skuController.text.trim(),
                   description: descController.text.trim(),
                   location: locationController.text.trim(),
-                  brand: brandController.text.trim(),
+                  brand: brandController.text.trim().isEmpty ? null : brandController.text.trim(),
                   branchId: item.branchId,
                 );
-                await DatabaseHelper.instance.updateMasterItem(updated);
+                await AppDatabase.instance.updateMasterItem(updated);
                 Navigator.pop(context);
                 _loadMasterItems();
               },
@@ -125,7 +124,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
   }
 
   void _deleteItem(int id) async {
-    await DatabaseHelper.instance.deleteMasterItem(id);
+    await AppDatabase.instance.deleteMasterItem(id);
     _loadMasterItems();
   }
 
@@ -155,14 +154,14 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                final newItem = MasterItem(
+                final newItem = MasterItemsCompanion.insert(
                   sku: skuController.text.trim(),
                   description: descController.text.trim(),
                   location: locationController.text.trim(),
-                  brand: brandController.text.trim(),
+                  brand: brandController.text.trim().isEmpty ? const Value.absent() : Value(brandController.text.trim()),
                   branchId: widget.branch.id!,
                 );
-                await DatabaseHelper.instance.createMasterItem(newItem);
+                await AppDatabase.instance.insertMasterItemFromCompanion(newItem);
                 Navigator.pop(context);
                 _loadMasterItems();
               },

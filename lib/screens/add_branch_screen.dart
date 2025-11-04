@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/widgets/item_form_fields.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
@@ -8,6 +7,7 @@ import 'package:csv/csv.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:logging/logging.dart';
+import 'package:drift/drift.dart' as drift;
 
 class AddBranchScreen extends StatefulWidget {
   const AddBranchScreen({super.key});
@@ -70,6 +70,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     }
 
     final masterItem = MasterItem(
+      id: 0, // Temporary ID, will be replaced when inserted
       sku: sku,
       description: _descriptionController.text.trim(),
       brand: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
@@ -257,15 +258,22 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             }
           }
 
+          // Check if SKU already exists in the imported items list
+          if (importedItems.any((item) => item.sku == sku)) {
+            _logger.info('Skipping duplicate SKU "$sku" in import from row $rowIndex');
+            continue;
+          }
+
           // Allow items with null or any numeric quantity (including 0)
           _logger.info('Adding item from row $rowIndex');
 
           final masterItem = MasterItem(
+            id: 0, // Temporary ID, will be replaced when inserted
             sku: sku,
             description: description,
             brand: finalBrand,
             location: _branchLocationController.text.trim(),
-            branchId: 0,
+            branchId: 0, // Will be updated after branch is created
           );
 
           importedItems.add(masterItem);
@@ -301,14 +309,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     });
 
     try {
-      final db = await DatabaseHelper.instance.database;
+      final db = AppDatabase.instance;
 
       // Check for unique branch code
-      final existingBranch = await db.query(
-        'branches',
-        where: 'code = ?',
-        whereArgs: [_codeController.text.trim()],
-      );
+      final existingBranch = await (db.select(db.branches)
+        ..where((b) => b.code.equals(_codeController.text.trim()))).get();
       if (existingBranch.isNotEmpty) {
         if (mounted) {
           _showSnackBar('Branch code already exists. Please choose a different code.', Colors.red);
@@ -316,28 +321,31 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         return;
       }
 
-      // Check for unique item SKUs within this branch (but allow same SKU in different branches)
+      // Create the branch first to get its ID
+      final branchId = await db.into(db.branches).insert(BranchesCompanion.insert(
+        name: _nameController.text.trim(),
+        location: _branchLocationController.text.trim(),
+        code: drift.Value(_codeController.text.trim()),
+        weeklyOrderOfftake: drift.Value(_weeklyOrderOfftakeController.text.trim()),
+        weeklyReorderPoint: drift.Value(_weeklyReorderPointController.text.trim()),
+        maintainingInventory: drift.Value(_maintainingInventoryController.text.trim()),
+      ));
+
+      // Check for unique item SKUs within this branch and insert items
       for (var item in _masterItems) {
-        final existingItem = await db.query(
-          'master_items',
-          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
-          whereArgs: [item.sku, _codeController.text.trim()],
-        );
-        if (existingItem.isNotEmpty) {
+        // Check if SKU already exists in master_items for this branch
+        final existingMasterItem = await (db.select(db.masterItems)
+          ..where((m) => m.sku.equals(item.sku) & m.branchId.equals(branchId))).get();
+        if (existingMasterItem.isNotEmpty) {
           if (mounted) {
             _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
           }
           return;
         }
-      }
 
-      // Also check for unique SKUs within the inventory_items table for this branch
-      for (var item in _masterItems) {
-        final existingInventoryItem = await db.query(
-          'inventory_items',
-          where: 'sku = ? AND branchId = (SELECT id FROM branches WHERE code = ?)',
-          whereArgs: [item.sku, _codeController.text.trim()],
-        );
+        // Check if SKU already exists in inventory_items for this branch
+        final existingInventoryItem = await (db.select(db.inventoryItems)
+          ..where((i) => i.sku.equals(item.sku) & i.branchId.equals(branchId))).get();
         if (existingInventoryItem.isNotEmpty) {
           if (mounted) {
             _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
@@ -346,46 +354,31 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         }
       }
 
-      await db.transaction((txn) async {
-        // Insert the branch first
-        final branchMap = {
-          'name': _nameController.text.trim(),
-          'location': _branchLocationController.text.trim(),
-          'code': _codeController.text.trim(),
-          'weeklyOrderOfftake': _weeklyOrderOfftakeController.text.trim(),
-          'weeklyReorderPoint': _weeklyReorderPointController.text.trim(),
-          'maintainingInventory': _maintainingInventoryController.text.trim(),
-        };
-        final branchId = await txn.insert('branches', branchMap);
+      // Insert master items and inventory items
+      for (var i = 0; i < _masterItems.length; i++) {
+        var item = _masterItems[i];
+        var quantity = _masterItemQuantities[i];
 
-        // Insert master items and inventory items for each
-        for (var i = 0; i < _masterItems.length; i++) {
-          var item = _masterItems[i];
-          var quantity = _masterItemQuantities[i];
+        // Insert into master_items
+        await db.into(db.masterItems).insert(MasterItemsCompanion.insert(
+          sku: item.sku,
+          description: item.description,
+          location: item.location,
+          brand: item.brand != null ? drift.Value(item.brand) : const drift.Value.absent(),
+          branchId: branchId,
+        ));
 
-          // Insert into master_items
-          final masterItemMap = {
-            'sku': item.sku,
-            'description': item.description,
-            'brand': item.brand,
-            'location': item.location,
-            'branchId': branchId,
-          };
-          await txn.insert('master_items', masterItemMap);
-
-          // Insert into inventory_items - handle null quantity
-          final inventoryItemMap = {
-            'sku': item.sku,
-            'description': item.description,
-            'brand': item.brand,
-            'end': quantity, // Will be 0 if quantity was null during import
-            'location': item.location,
-            'dateAdded': DateTime.now().toIso8601String(),
-            'branchId': branchId,
-          };
-          await txn.insert('inventory_items', inventoryItemMap);
-        }
-      });
+        // Insert into inventory_items
+        await db.into(db.inventoryItems).insert(InventoryItemsCompanion.insert(
+          sku: item.sku,
+          description: item.description,
+          end: quantity,
+          location: item.location,
+          brand: item.brand != null ? drift.Value(item.brand) : const drift.Value.absent(),
+          dateAdded: DateTime.now().toIso8601String(),
+          branchId: branchId,
+        ));
+      }
 
       if (mounted) {
         _showSnackBar('Branch, master items, and inventory added successfully!', Colors.green);
@@ -836,7 +829,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                       ),
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ],
                             ],
                           ),

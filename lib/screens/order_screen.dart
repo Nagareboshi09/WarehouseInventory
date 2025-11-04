@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/order.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
+import 'package:drift/drift.dart' as drift;
+// Using Drift-generated classes instead of old model classes
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
@@ -37,7 +36,7 @@ class _OrderScreenState extends State<OrderScreen> {
 
   Future<void> _loadData() async {
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
       setState(() {
         _branches = branches;
       });
@@ -59,10 +58,10 @@ class _OrderScreenState extends State<OrderScreen> {
   Future<void> _loadMasterItems() async {
     if (_selectedBranch == null) return;
     try {
-      final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(
+      final masterItems = await AppDatabase.instance.getMasterItemsByBranch(
         _selectedBranch!.id!,
       );
-      final inventoryItems = await DatabaseHelper.instance.getInventoryItemsByBranch(
+      final inventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
         _selectedBranch!.id!,
       );
 
@@ -137,27 +136,39 @@ class _OrderScreenState extends State<OrderScreen> {
     final batchId = DateTime.now().millisecondsSinceEpoch.toString();
 
     // Create orders for each item with quantity > 0
-    List<Order> orders = [];
+    List<OrdersCompanion> orderCompanions = [];
     for (var item in _masterItems) {
       int quantity = _orderQuantities[item.id!] ?? 0;
       if (quantity > 0) {
-        final order = Order(
+        final orderCompanion = OrdersCompanion.insert(
           branchId: _selectedBranch!.id!,
           location: _locationController.text.trim(),
           brand: item.brand ?? '',
           itemId: item.id!,
           quantity: quantity,
-          dateOrdered: DateTime.now(),
-          batchId: batchId,
+          dateOrdered: DateTime.now().toIso8601String(),
+          batchId: drift.Value(batchId),
         );
-        orders.add(order);
+        orderCompanions.add(orderCompanion);
       }
     }
 
     // Add orders to provider
     try {
-      for (var order in orders) {
-        await context.read<OrderProvider>().addOrder(order);
+      for (var orderCompanion in orderCompanions) {
+        await AppDatabase.instance.insertOrder(
+          Order(
+            id: 0, // Will be auto-generated
+            branchId: orderCompanion.branchId.value,
+            location: orderCompanion.location.value,
+            brand: orderCompanion.brand.value,
+            itemId: orderCompanion.itemId.value,
+            quantity: orderCompanion.quantity.value,
+            dateOrdered: orderCompanion.dateOrdered.value,
+            status: 'pending',
+            batchId: orderCompanion.batchId.value!,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -180,7 +191,7 @@ class _OrderScreenState extends State<OrderScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${orders.length} order(s) submitted successfully!'),
+          content: Text('${orderCompanions.length} order(s) submitted successfully!'),
           backgroundColor: Colors.green,
         ),
       );

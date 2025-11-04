@@ -38,9 +38,11 @@ dependencies:
   # State management
   provider: ^6.1.1
   
-  # Local database for offline support
-  sqflite: ^2.3.2
+  # Local database for offline support (replacing sqflite with Drift)
+  drift: ^2.14.1
+  sqlite3_flutter_libs: ^0.5.18
   path_provider: ^2.1.2
+  path: ^1.9.0
   
   # UI components
   flutter_svg: ^2.0.9
@@ -71,6 +73,9 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
+  # Drift code generation
+  drift_dev: ^2.14.1
+  build_runner: ^2.4.12
   flutter_lints: ^5.0.0
 
 # For information on the generic Dart part of this file, see the

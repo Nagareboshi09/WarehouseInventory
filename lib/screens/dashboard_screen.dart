@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
-import 'package:warehouse_inventory/models/inventory_item.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/order.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
 import 'package:warehouse_inventory/screens/master_data_screen.dart';
 
@@ -16,6 +11,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // Use Drift-generated classes directly - imported from app_database.dart
   List<Branch> _branches = [];
   Branch? _selectedBranch;
   int _totalMasterItems = 0;
@@ -23,7 +19,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _lowStockItems = 0;
   int _totalOrders = 0;
   List<Order> _orders = [];
-  List<InventoryItem> _inventoryItems = [];
   bool _isLoading = true;
 
   @override
@@ -38,7 +33,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
       setState(() {
         _branches = branches;
         _isLoading = false;
@@ -48,36 +43,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
       });
       // Handle error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load branches: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _loadAllData() async {
-    if (_selectedBranch == null) {
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final allMasterItems = await AppDatabase.instance.getAllMasterItems();
+      final allInventoryItems = await AppDatabase.instance.getAllInventoryItems();
+      final allOrders = await AppDatabase.instance.getAllOrders();
+      
+      int totalMaster = allMasterItems.length;
+      int totalInventoryQuantity = allInventoryItems.fold(0, (sum, item) => sum + item.end);
+      int lowStock = allInventoryItems.where((item) => item.end <= 10).length;
+      int totalOrders = allOrders.length;
+      
       setState(() {
-        _isLoading = true;
+        _totalMasterItems = totalMaster;
+        _totalInventoryQuantity = totalInventoryQuantity;
+        _lowStockItems = lowStock;
+        _totalOrders = totalOrders;
+        _orders = allOrders;
+        _isLoading = false;
       });
-      try {
-        final allMasterItems = await DatabaseHelper.instance.getAllMasterItems();
-        final allInventoryItems = await DatabaseHelper.instance.getAllInventoryItems();
-        final allOrders = await DatabaseHelper.instance.getAllOrders();
-        int totalMaster = allMasterItems.length;
-        int totalInventoryQuantity = allInventoryItems.fold(0, (sum, item) => sum + item.end);
-        int lowStock = allInventoryItems.where((item) => item.end <= 10).length;
-        int totalOrders = allOrders.length;
-        setState(() {
-          _totalMasterItems = totalMaster;
-          _totalInventoryQuantity = totalInventoryQuantity;
-          _lowStockItems = lowStock;
-          _totalOrders = totalOrders;
-          _inventoryItems = allInventoryItems;
-          _orders = allOrders;
-          _isLoading = false;
-        });
-      } catch (e) {
-        setState(() {
-          _isLoading = false;
-        });
-        // Handle error
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Handle error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -87,21 +97,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     try {
-      final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(branch.id!);
-      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(branch.id!);
-      final orders = await DatabaseHelper.instance.getOrdersByBranch(branch.id!);
+      final masterItems = await AppDatabase.instance.getMasterItemsByBranch(branch.id);
+      final items = await AppDatabase.instance.getInventoryItemsByBranch(branch.id);
+      final orders = await AppDatabase.instance.getOrdersByBranch(branch.id);
+      
       int totalMaster = masterItems.length;
-      int maintainingInventory = int.tryParse(branch.maintainingInventory ?? '10') ?? 10;
+      // Parse maintainingInventory as int, default to 10 if null or invalid
+      int maintainingInventory = branch.maintainingInventory != null 
+          ? int.tryParse(branch.maintainingInventory!) ?? 10 
+          : 10;
       int lowStockThreshold = maintainingInventory - 1;
       int lowStock = items.where((item) => item.end <= lowStockThreshold).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
       int totalOrders = orders.length;
+      
       setState(() {
         _totalMasterItems = totalMaster;
         _totalInventoryQuantity = totalInventoryQuantity;
         _lowStockItems = lowStock;
         _totalOrders = totalOrders;
-        _inventoryItems = items;
         _orders = orders;
         _isLoading = false;
       });
@@ -110,6 +124,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
       });
       // Handle error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load branch data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -134,8 +156,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: isDarkMode
-                      ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
-                      : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+                      ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D), const Color(0xFF3A3A3A)]
+                      : [const Color(0xFF0651A4), const Color(0xFF0A7BFF), const Color(0xFF42A5F5)],
                 ),
               ),
               child: Stack(
@@ -149,7 +171,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 80,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -161,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 60,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                       ),
                     ),
                   ),
@@ -173,7 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                   ),
@@ -185,7 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       height: 70,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                        color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                   ),
@@ -293,6 +315,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   itemCount: _orders.length,
                                   itemBuilder: (context, index) {
                                     final order = _orders[index];
+                                    // Parse date string to DateTime for display
+                                    DateTime? orderDate;
+                                    try {
+                                      orderDate = DateTime.parse(order.dateOrdered);
+                                    } catch (e) {
+                                      orderDate = null;
+                                    }
                                     return Card(
                                       margin: const EdgeInsets.symmetric(vertical: 4.0),
                                       child: ListTile(
@@ -303,7 +332,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         title: Text('${order.brand} - Item ${order.itemId}'),
                                         subtitle: Text('Quantity: ${order.quantity} • Status: ${order.status}'),
                                         trailing: Text(
-                                          '${order.dateOrdered.day}/${order.dateOrdered.month}/${order.dateOrdered.year}',
+                                          orderDate != null 
+                                              ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
+                                              : order.dateOrdered,
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey.shade600,
@@ -355,8 +386,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  color.withOpacity(0.1),
-                  color.withOpacity(0.05),
+                  color.withValues(alpha: 0.1),
+                  color.withValues(alpha: 0.05),
                 ],
               ),
             ),
@@ -402,5 +433,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-
 }

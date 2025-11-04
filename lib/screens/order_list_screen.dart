@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:warehouse_inventory/models/order.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
@@ -53,8 +53,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: isDarkMode
-                    ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
-                    : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+                    ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D), const Color(0xFF3A3A3A)]
+                    : [const Color(0xFF0651A4), const Color(0xFF0A7BFF), const Color(0xFF42A5F5)],
               ),
             ),
             child: Stack(
@@ -68,7 +68,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -80,7 +80,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                     ),
                   ),
                 ),
@@ -92,7 +92,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -104,7 +104,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                     ),
                   ),
                 ),
@@ -140,7 +140,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   shadows: [
                                     Shadow(
                                       blurRadius: 10.0,
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(alpha: 0.3),
                                       offset: const Offset(2, 2),
                                     ),
                                   ],
@@ -158,7 +158,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(32),
                                     decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                                      color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                                       borderRadius: BorderRadius.circular(30),
                                     ),
                                     child: Column(
@@ -167,13 +167,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                         Container(
                                           padding: const EdgeInsets.all(20),
                                           decoration: BoxDecoration(
-                                            color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                            color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Icon(
                                             Icons.shopping_cart_outlined,
                                             size: 60,
-                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         const SizedBox(height: 20),
@@ -182,7 +182,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                           style: TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.bold,
-                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -213,6 +213,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     0,
                                     (sum, order) => sum + order.quantity,
                                   );
+                                  
+                                  // Parse date string for display
+                                  DateTime? firstOrderDate;
+                                  try {
+                                    firstOrderDate = DateTime.parse(firstOrder.dateOrdered);
+                                  } catch (e) {
+                                    firstOrderDate = null;
+                                  }
+                                  
                                   return Card(
                                     elevation: 6,
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -222,7 +231,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     color: isDarkMode ? Colors.grey[800] : Colors.white,
                                     shadowColor: const Color(
                                       0xFF0651A4,
-                                    ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                    ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                     child: InkWell(
                                       onTap: () => _showBatchDetails(
                                         context,
@@ -242,7 +251,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                     12,
                                                   ),
                                                   decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           15,
@@ -250,7 +259,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                   ),
                                                   child: Icon(
                                                     Icons.inventory_2,
-                                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                                     size: 24,
                                                   ),
                                                 ),
@@ -267,7 +276,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                           fontSize: 18,
                                                           fontWeight:
                                                               FontWeight.bold,
-                                                          color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                          color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                                         ),
                                                       ),
                                                       Text(
@@ -287,17 +296,19 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                         vertical: 6,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           15,
                                                         ),
                                                   ),
                                                   child: Text(
-                                                    '${firstOrder.dateOrdered.day}/${firstOrder.dateOrdered.month}/${firstOrder.dateOrdered.year}',
+                                                    firstOrderDate != null 
+                                                        ? '${firstOrderDate.day}/${firstOrderDate.month}/${firstOrderDate.year}'
+                                                        : firstOrder.dateOrdered,
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                                      color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
@@ -332,7 +343,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                     vertical: 6,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                                color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(15),
                                               ),
@@ -340,7 +351,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                 'Tap to view order details',
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                                   fontStyle: FontStyle.italic,
                                                 ),
                                               ),
@@ -406,7 +417,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -418,7 +429,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                    color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -452,7 +463,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                         color: isDarkMode ? Colors.grey[800] : Colors.white,
-                        shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.2),
+                        shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -463,7 +474,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   CircleAvatar(
                                     backgroundColor: const Color(
                                       0xFF0651A4,
-                                    ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                    ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                     child: Text(
                                       '${index + 1}',
                                       style: const TextStyle(
@@ -483,7 +494,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
-                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         Text(
@@ -509,14 +520,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(15),
                                     ),
                                     child: Text(
                                       'Qty: ${order.quantity}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                       ),
                                     ),
                                   ),
@@ -535,14 +546,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                      backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
                       elevation: 4,
-                      shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.3),
+                      shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                     ),
                     child: const Text(
                       'Close',

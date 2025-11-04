@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/edit_master_item_screen.dart';
 
 class EditBranchScreen extends StatefulWidget {
@@ -27,10 +26,10 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.branch.name);
     _locationController = TextEditingController(text: widget.branch.location);
-    _codeController = TextEditingController(text: widget.branch.code);
-    _weeklyOrderOfftakeController = TextEditingController(text: widget.branch.weeklyOrderOfftake);
-    _weeklyReorderPointController = TextEditingController(text: widget.branch.weeklyReorderPoint);
-    _maintainingInventoryController = TextEditingController(text: widget.branch.maintainingInventory);
+    _codeController = TextEditingController(text: widget.branch.code ?? '');
+    _weeklyOrderOfftakeController = TextEditingController(text: widget.branch.weeklyOrderOfftake ?? '');
+    _weeklyReorderPointController = TextEditingController(text: widget.branch.weeklyReorderPoint ?? '');
+    _maintainingInventoryController = TextEditingController(text: widget.branch.maintainingInventory ?? '');
   }
 
   Future<void> _updateBranch() async {
@@ -41,8 +40,9 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
     });
 
     try {
+      // Create a new Branch object using the Drift-generated class
       final updatedBranch = Branch(
-        id: widget.branch.id,
+        id: widget.branch.id!,
         name: _nameController.text.trim(),
         location: _locationController.text.trim(),
         code: _codeController.text.trim().isEmpty
@@ -59,22 +59,22 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
             : _maintainingInventoryController.text.trim(),
       );
 
-      await DatabaseHelper.instance.updateBranch(updatedBranch);
-
+      await AppDatabase.instance.updateBranch(updatedBranch);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Branch updated successfully!!'),
+            content: Text('Branch updated successfully'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error on updating branch: ${e.toString()}'),
+            content: Text('Error updating branch: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -89,43 +89,46 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
   }
 
   Future<void> _deleteBranch() async {
-    final confirmed = await showDialog<bool>(
+    if (!mounted) return;
+
+    final confirmDelete = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Branch'),
-        content: const Text(
-          'Are you sure you want to delete this branch? This will also delete all associated master items and inventory items.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Branch'),
+          content: const Text(
+              'Are you sure you want to delete this branch? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
 
-    if (confirmed != true) return;
+    if (confirmDelete != true) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await DatabaseHelper.instance.deleteBranch(widget.branch.id!);
-
+      await AppDatabase.instance.deleteBranch(widget.branch.id!);
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Branch deleted successfully!'),
+            content: Text('Branch deleted successfully'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -169,8 +172,8 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDarkMode
-                ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
-                : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+                ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D), const Color(0xFF3A3A3A)]
+                : [const Color(0xFF0651A4), const Color(0xFF0A7BFF), const Color(0xFF42A5F5)],
           ),
         ),
         child: Stack(
@@ -291,7 +294,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -302,11 +305,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Branch Name',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.store,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -330,7 +333,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -341,11 +344,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Location',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.location_on,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -369,7 +372,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -380,11 +383,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Code',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.code,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -401,7 +404,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -412,11 +415,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Weekly Order Offtake',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.shopping_cart,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -433,7 +436,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -444,11 +447,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Weekly ReOrder Point',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.warning,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -465,7 +468,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                       borderRadius: BorderRadius.circular(15),
                                       border: Border.all(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4).withOpacity(0.3),
                                       ),
                                     ),
                                     child: TextFormField(
@@ -476,11 +479,11 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Maintaining Inventory',
                                         labelStyle: TextStyle(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         prefixIcon: Icon(
                                           Icons.inventory,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                         ),
                                         border: InputBorder.none,
                                         contentPadding:
@@ -498,7 +501,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
                                       'Edit Master Items for this Branch',
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                      backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 14,
@@ -555,7 +558,7 @@ class _EditBranchScreenState extends State<EditBranchScreen> {
           FloatingActionButton(
             onPressed: _isLoading ? null : _updateBranch,
             heroTag: 'save',
-            backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+            backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
             foregroundColor: Colors.white,
             child: _isLoading
                 ? const CircularProgressIndicator(color: Colors.white)

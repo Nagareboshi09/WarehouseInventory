@@ -1,4 +1,4 @@
-import 'dart:async';
+   import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:warehouse_inventory/models/user.dart';
@@ -453,8 +453,13 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE inventory_items ADD COLUMN sales INTEGER');
     }
     if (oldVersion < 12) {
-      // Add lastUpdated column to inventory_items table
-      await db.execute('ALTER TABLE inventory_items ADD COLUMN lastUpdated TEXT');
+      // Add lastUpdated column to inventory_items table if it doesn't exist
+      try {
+        await db.execute('ALTER TABLE inventory_items ADD COLUMN lastUpdated TEXT');
+      } catch (e) {
+        // Column might already exist, ignore the error
+        print('lastUpdated column might already exist: $e');
+      }
     }
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/inventory_item.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'add_inventory_item_screen.dart';
 import 'dart:async';
@@ -28,24 +27,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _branchSelected = false;
   String _searchQuery = '';
   String _branchSearchQuery = '';
-  StreamSubscription<String>? _updateSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadBranches();
-    _updateSubscription = DatabaseHelper.instance.updateStream.listen((event) {
-      if (event == 'master_item_updated' && _selectedBranch != null) {
-        _loadInventoryItems();
-      } else if (event == 'branch_updated') {
-        _loadBranches();
-      }
-    });
   }
 
-  Future<void> _loadBranches() async {
+Future<void> _loadBranches() async {
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
       if (mounted) {
         setState(() {
           _branches = branches;
@@ -94,7 +85,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  Future<void> _loadInventoryItems() async {
+Future<void> _loadInventoryItems() async {
     if (_selectedBranch == null) return;
 
     setState(() {
@@ -102,7 +93,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
 
     try {
-      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(
+      final items = await AppDatabase.instance.getInventoryItemsByBranch(
         _selectedBranch!.id!,
       );
       if (mounted) {
@@ -202,7 +193,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       // Add inventory items
       for (var item in _inventoryItems) {
         final brand = item.brand ?? 'N/A';
-        final dateAdded = '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+        // dateAdded is stored as ISO string in drift database
+        final dateAdded = item.dateAdded;
         csvContent += '${item.sku},"${item.description}",$brand,${item.location},${item.end},$dateAdded\n';
       }
 
@@ -384,7 +376,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Last Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(item.lastUpdated!.toLocal()) : 'Never'}',
+'Last Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
                               style: TextStyle(
                                 color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                               ),
@@ -987,7 +979,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                             sales: newSales == 0 ? null : newSales,
                                           );
 
-                                          await DatabaseHelper.instance
+await AppDatabase.instance
                                               .updateInventoryItem(updatedItem);
 
                                           if (mounted) {
@@ -1404,14 +1396,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     filterValue.toLowerCase(),
                                                   );
                                             case 'date':
-                                              final formattedDate =
-                                                  '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                               return formattedDate.contains(
                                                     filterValue,
                                                   ) ||
-                                                  item.dateAdded
-                                                      .toIso8601String()
-                                                      .contains(filterValue);
+                                                  item.dateAdded.contains(filterValue);
                                             case 'brand':
                                               return (item.brand ?? '')
                                                   .toLowerCase()
@@ -1495,7 +1484,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     ),
                                                   ),
                                                   subtitle: Text(
-                                                    'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(item.lastUpdated!.toLocal()) : 'Never'}',
+'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),
@@ -1552,9 +1541,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  @override
+@override
   void dispose() {
-    _updateSubscription?.cancel();
     super.dispose();
   }
 

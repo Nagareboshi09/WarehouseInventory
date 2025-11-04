@@ -1,8 +1,9 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/models/order.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 
 class OrderProvider with ChangeNotifier {
+  static const String _tag = 'OrderProvider';
   List<Order> _orders = [];
   bool _isLoading = false;
 
@@ -17,9 +18,12 @@ class OrderProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      _orders = await DatabaseHelper.instance.getAllOrders();
+      _orders = await AppDatabase.instance.getAllOrders();
     } catch (e) {
-      print('Error loading orders: $e');
+      developer.log('Error loading orders from database',
+          error: e.toString(),
+          stackTrace: StackTrace.current,
+          name: _tag);
       _orders = [];
     } finally {
       _isLoading = false;
@@ -29,35 +33,29 @@ class OrderProvider with ChangeNotifier {
 
   Future<void> addOrder(Order order) async {
     try {
-      final savedOrder = await DatabaseHelper.instance.createOrder(order);
-      _orders.add(savedOrder);
+      await AppDatabase.instance.insertOrder(order);
+      
+      // Reload orders from database
+      await loadOrders();
+      
       notifyListeners();
     } catch (e) {
-      // Handle error
       rethrow;
     }
   }
 
   Future<void> removeOrder(Order order) async {
-    if (order.id != null) {
-      try {
-        await DatabaseHelper.instance.deleteOrder(order.id!);
-        _orders.remove(order);
-        notifyListeners();
-      } catch (e) {
-        // Handle error
-      }
-    }
+    await AppDatabase.instance.deleteOrder(order.id);
+    await loadOrders(); // Reload orders from database
+    notifyListeners();
   }
 
   Future<void> clearOrders() async {
     try {
       for (final order in _orders) {
-        if (order.id != null) {
-          await DatabaseHelper.instance.deleteOrder(order.id!);
-        }
+        await AppDatabase.instance.deleteOrder(order.id);
       }
-      _orders.clear();
+      await loadOrders(); // Reload orders from database
       notifyListeners();
     } catch (e) {
       // Handle error
@@ -66,7 +64,7 @@ class OrderProvider with ChangeNotifier {
 
   Future<List<Order>> getOrdersByBranch(int branchId) async {
     try {
-      return await DatabaseHelper.instance.getOrdersByBranch(branchId);
+      return await AppDatabase.instance.getOrdersByBranch(branchId);
     } catch (e) {
       return [];
     }

@@ -120,10 +120,15 @@ class AppDatabase extends _$AppDatabase {
       return NativeDatabase.memory();
     }
 
-    // For mobile and desktop platforms
-    return NativeDatabase(
-      File(p.join(Directory.systemTemp.path, 'warehouse_inventory.db')),
-      logStatements: true,
+    // For mobile and desktop platforms - use LazyDatabase for async path resolution
+    return LazyDatabase(
+      () async {
+        final docsDir = await getApplicationDocumentsDirectory();
+        return NativeDatabase(
+          File(p.join(docsDir.path, 'warehouse_inventory.db')),
+          logStatements: true,
+        );
+      },
     );
   }
 

@@ -59,10 +59,10 @@ class _OrderScreenState extends State<OrderScreen> {
     if (_selectedBranch == null) return;
     try {
       final masterItems = await AppDatabase.instance.getMasterItemsByBranch(
-        _selectedBranch!.id!,
+        _selectedBranch?.id ?? 0,
       );
       final inventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
-        _selectedBranch!.id!,
+        _selectedBranch?.id ?? 0,
       );
 
       // Create a map of SKU to stock quantity and sales
@@ -82,8 +82,8 @@ class _OrderScreenState extends State<OrderScreen> {
         _quantityControllers.clear();
         _orderQuantities.clear();
         for (var item in masterItems) {
-          _quantityControllers[item.id!] = TextEditingController();
-          _orderQuantities[item.id!] = 0;
+          _quantityControllers[item.id ?? 0] = TextEditingController();
+          _orderQuantities[item.id ?? 0] = 0;
         }
       });
     } catch (e) {
@@ -138,15 +138,16 @@ class _OrderScreenState extends State<OrderScreen> {
     // Create orders for each item with quantity > 0
     List<OrdersCompanion> orderCompanions = [];
     for (var item in _masterItems) {
-      int quantity = _orderQuantities[item.id!] ?? 0;
+      int quantity = _orderQuantities[item.id ?? 0] ?? 0;
       if (quantity > 0) {
         final orderCompanion = OrdersCompanion.insert(
-          branchId: _selectedBranch!.id!,
+          branchId: _selectedBranch?.id ?? 0,
           location: _locationController.text.trim(),
           brand: item.brand ?? '',
-          itemId: item.id!,
+          itemId: item.id ?? 0,
           quantity: quantity,
           dateOrdered: DateTime.now().toIso8601String(),
+          status: const drift.Value('pending'),
           batchId: drift.Value(batchId),
         );
         orderCompanions.add(orderCompanion);
@@ -156,19 +157,7 @@ class _OrderScreenState extends State<OrderScreen> {
     // Add orders to provider
     try {
       for (var orderCompanion in orderCompanions) {
-        await AppDatabase.instance.insertOrder(
-          Order(
-            id: 0, // Will be auto-generated
-            branchId: orderCompanion.branchId.value,
-            location: orderCompanion.location.value,
-            brand: orderCompanion.brand.value,
-            itemId: orderCompanion.itemId.value,
-            quantity: orderCompanion.quantity.value,
-            dateOrdered: orderCompanion.dateOrdered.value,
-            status: 'pending',
-            batchId: orderCompanion.batchId.value!,
-          ),
-        );
+        await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
       }
     } catch (e) {
       if (mounted) {
@@ -205,7 +194,7 @@ class _OrderScreenState extends State<OrderScreen> {
       setState(() {
         _orderQuantities.clear();
         for (var item in _masterItems) {
-          _orderQuantities[item.id!] = 0;
+          _orderQuantities[item.id ?? 0] = 0;
         }
         _searchQuery = '';
         _filteredItems = _masterItems;
@@ -256,7 +245,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -268,7 +257,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -280,7 +269,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -292,7 +281,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -328,7 +317,7 @@ class _OrderScreenState extends State<OrderScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -348,11 +337,11 @@ class _OrderScreenState extends State<OrderScreen> {
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                                color: isDarkMode ? (Colors.grey[850] ?? Colors.grey).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                                    color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                     blurRadius: 10,
                                     offset: const Offset(0, 5),
                                   ),
@@ -397,7 +386,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: DropdownButtonFormField<Branch>(
@@ -453,7 +442,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: TextFormField(
@@ -530,7 +519,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         height: 300,
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                           ),
                                           borderRadius: BorderRadius.circular(
                                             20,
@@ -554,7 +543,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                               color: isDarkMode ? Colors.grey[800] : Colors.white,
                                               shadowColor: const Color(
                                                 0xFF0651A4,
-                                              ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                              ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                               child: Padding(
                                                 padding: const EdgeInsets.all(
                                                   12,
@@ -568,7 +557,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                           backgroundColor:
                                                               const Color(
                                                                 0xFF0651A4,
-                                                              ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                              ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                                           child: const Icon(
                                                             Icons.inventory,
                                                             color: Color(
@@ -635,7 +624,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                               color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                                                               borderRadius: BorderRadius.circular(8),
                                                               border: Border.all(
-                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                                               ),
                                                             ),
                                                             child: Column(
@@ -654,7 +643,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                 SizedBox(
                                                                   height: 24,
                                                                   child: TextField(
-                                                                    controller: _quantityControllers[item.id!],
+                                                                    controller: _quantityControllers[item.id ?? 0],
                                                                     textAlign: TextAlign.center,
                                                                     style: TextStyle(
                                                                       fontSize: 14,
@@ -673,7 +662,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                     ],
                                                                     onChanged: (value) {
                                                                       setState(() {
-                                                                        _orderQuantities[item.id!] = int.tryParse(value) ?? 0;
+                                                                        _orderQuantities[item.id ?? 0] = int.tryParse(value) ?? 0;
                                                                       });
                                                                     },
                                                                   ),
@@ -691,7 +680,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                               color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                                                               borderRadius: BorderRadius.circular(8),
                                                               border: Border.all(
-                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                                               ),
                                                             ),
                                                             child: Column(
@@ -734,7 +723,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(24),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.1),
+                                          color: Colors.red.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -779,7 +768,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                 elevation: 6,
                                 shadowColor: const Color(
                                   0xFF0651A4,
-                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                                ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                               ),
                               icon: _isLoading
                                   ? const SizedBox(

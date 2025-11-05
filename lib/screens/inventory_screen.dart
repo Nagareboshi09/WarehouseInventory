@@ -367,18 +367,37 @@ Future<void> _loadInventoryItems() async {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.update,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.update,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Last Updated:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-'Last Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                item.lastUpdated != null
+                                  ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!))
+                                  : 'Never',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  fontSize: 14,
+                                ),
                               ),
                             ),
                           ],
@@ -973,6 +992,7 @@ Future<void> _loadInventoryItems() async {
                                             location: item.location,
                                             brand: item.brand,
                                             dateAdded: item.dateAdded,
+                                            lastUpdated: DateTime.now().toIso8601String(),
                                             branchId: item.branchId,
                                             beg: newBeg == 0 ? null : newBeg,
                                             prev: newPrev == 0 ? null : newPrev,
@@ -1484,7 +1504,7 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                     ),
                                                   ),
                                                   subtitle: Text(
-'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('yyyy-MM-dd hh:mm:ss a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
+'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),

@@ -134,6 +134,9 @@ class _OrderScreenState extends State<OrderScreen> {
 
     // Generate a unique batch ID for this order session
     final batchId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // Preserve the location value before form reset
+    final savedLocation = _locationController.text.trim();
 
     // Create orders for each item with quantity > 0
     List<OrdersCompanion> orderCompanions = [];
@@ -186,7 +189,7 @@ class _OrderScreenState extends State<OrderScreen> {
       );
       // Reset form
       _formKey.currentState!.reset();
-      _locationController.clear();
+      // Don't clear location - keep it for continuity
       // Clear quantities
       for (var controller in _quantityControllers.values) {
         controller.clear();
@@ -200,6 +203,8 @@ class _OrderScreenState extends State<OrderScreen> {
         _filteredItems = _masterItems;
         _inventoryStock.clear();
         _itemSales.clear();
+        // Restore the location field with the saved value
+        _locationController.text = savedLocation;
       });
     }
 

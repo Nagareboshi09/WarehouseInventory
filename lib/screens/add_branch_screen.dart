@@ -304,6 +304,28 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   Future<void> _saveBranch() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Check if at least one item has been added
+    if (_masterItems.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Items Required'),
+            content: const Text('Please add at least one item before creating the branch.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -846,11 +868,15 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isLoading ? null : _saveBranch,
-        backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+        onPressed: (_isLoading || _masterItems.isEmpty) ? null : _saveBranch,
+        backgroundColor: _masterItems.isEmpty
+            ? Colors.grey
+            : (isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4)),
         label: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
-            : const Text('Add Branch'),
+            : (_masterItems.isEmpty
+                ? const Text('Add Items First')
+                : const Text('Add Branch')),
         icon: const Icon(Icons.add),
       ),
     );

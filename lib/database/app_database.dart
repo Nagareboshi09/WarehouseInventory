@@ -166,6 +166,53 @@ class AppDatabase extends _$AppDatabase {
     return result; // Return the generated Branch class directly
   }
 
+  Future<Branch?> getBranchByCode(String code) async {
+    final result = await (select(branches)
+      ..where((b) => b.code.equals(code))).getSingleOrNull();
+    return result; // Return the generated Branch class directly
+  }
+
+  Future<bool> branchCodeExists(String code) async {
+    final existingBranch = await (select(branches)
+      ..where((b) => b.code.equals(code))).getSingleOrNull();
+    return existingBranch != null;
+  }
+
+  // Cleanup orphaned data - call this once to fix existing database
+  Future<void> cleanupOrphanedData() async {
+    // Get all existing branch IDs
+    final allBranches = await select(branches).get();
+    final validBranchIds = allBranches.map((b) => b.id).toSet();
+    
+    print('Valid branch IDs: $validBranchIds');
+    
+    // Delete orphaned master items
+    final orphanedMasterItems = await (select(masterItems)
+      ..where((m) => m.branchId.isNotIn(validBranchIds))).get();
+    if (orphanedMasterItems.isNotEmpty) {
+      print('Found ${orphanedMasterItems.length} orphaned MasterItems, deleting...');
+      await (delete(masterItems)..where((m) => m.branchId.isNotIn(validBranchIds))).go();
+    }
+    
+    // Delete orphaned inventory items
+    final orphanedInventoryItems = await (select(inventoryItems)
+      ..where((i) => i.branchId.isNotIn(validBranchIds))).get();
+    if (orphanedInventoryItems.isNotEmpty) {
+      print('Found ${orphanedInventoryItems.length} orphaned InventoryItems, deleting...');
+      await (delete(inventoryItems)..where((i) => i.branchId.isNotIn(validBranchIds))).go();
+    }
+    
+    // Delete orphaned orders
+    final orphanedOrders = await (select(orders)
+      ..where((o) => o.branchId.isNotIn(validBranchIds))).get();
+    if (orphanedOrders.isNotEmpty) {
+      print('Found ${orphanedOrders.length} orphaned Orders, deleting...');
+      await (delete(orders)..where((o) => o.branchId.isNotIn(validBranchIds))).go();
+    }
+    
+    print('Database cleanup completed!');
+  }
+
   Future<int> insertBranch(Branch branch) async {
     return await into(branches).insert(
       branch.toCompanion(false),
@@ -177,6 +224,17 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> deleteBranch(int id) async {
+    // Delete in correct order to handle foreign key dependencies
+    // 1. Delete orders referencing this branch
+    await (delete(orders)..where((o) => o.branchId.equals(id))).go();
+    
+    // 2. Delete inventory items for this branch
+    await (delete(inventoryItems)..where((i) => i.branchId.equals(id))).go();
+    
+    // 3. Delete master items for this branch
+    await (delete(masterItems)..where((m) => m.branchId.equals(id))).go();
+    
+    // 4. Finally delete the branch itself
     await (delete(branches)..where((b) => b.id.equals(id))).go();
   }
 
@@ -242,9 +300,16 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<bool> checkSkuExistsInBranch(String sku, int branchId) async {
-    final result = await (select(inventoryItems)
+    // Check if SKU exists in master_items for this branch
+    final existingMasterItem = await (select(masterItems)
+      ..where((m) => m.sku.equals(sku) & m.branchId.equals(branchId))).getSingleOrNull();
+    
+    // Check if SKU exists in inventory_items for this branch
+    final existingInventoryItem = await (select(inventoryItems)
       ..where((i) => i.sku.equals(sku) & i.branchId.equals(branchId))).getSingleOrNull();
-    return result != null;
+    
+    // SKU exists if it exists in either table
+    return existingMasterItem != null || existingInventoryItem != null;
   }
 
   // Order methods

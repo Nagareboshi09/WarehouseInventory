@@ -4,13 +4,26 @@ import 'package:logging/logging.dart';
 import 'theme_notifier.dart';
 import 'providers/order_provider.dart';
 import 'screens/login_screen.dart';
+import 'database/app_database.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Enable comprehensive logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}');
   });
+  
+  // Initialize database and cleanup orphaned data
+  try {
+    final db = AppDatabase.instance;
+    await db.cleanupOrphanedData();
+    print('✅ Database cleanup completed successfully');
+  } catch (e) {
+    print('❌ Error during database cleanup: $e');
+  }
+  
   runApp(
     MultiProvider(
       providers: [

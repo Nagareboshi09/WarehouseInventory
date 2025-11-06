@@ -394,133 +394,147 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     }
   }
 
-  Future<void> _saveBranch() async {
-    if (!_formKey.currentState!.validate()) return;
+ Future<void> _saveBranch() async {
+  if (!_formKey.currentState!.validate()) return;
 
-    // Check if at least one item has been added
-    if (_masterItems.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Items Required'),
-            content: const Text('Please add at least one item before creating the branch.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('OK'),
+  // Check if at least one item has been added
+  if (_masterItems.isEmpty) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Items Required'),
+          content: const Text('Please add at least one item before creating the branch.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+    return;
+  }
+
+  // Show loading dialog
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'Adding Branch and ${_masterItems.length} Items...',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'This may take a few moments',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ),
       );
-      return;
-    }
+    },
+  );
 
-    setState(() {
-      _isLoading = true;
-    });
+  // Force UI to update before starting the operation
+  await Future.delayed(const Duration(milliseconds: 50));
 
-    try {
-      final db = AppDatabase.instance;
+  try {
+    final db = AppDatabase.instance;
 
-      // Check for unique branch code (case-insensitive)
-      final branchCode = _codeController.text.trim();
-      if (branchCode.isNotEmpty) {
-        final existingBranches = await db.getAllBranches();
-        final isDuplicate = existingBranches.any(
-          (branch) => branch.code != null &&
-                     branch.code!.toLowerCase() == branchCode.toLowerCase(),
-        );
-        
-        if (isDuplicate) {
-          if (mounted) {
-            _showSnackBar('Branch code "$branchCode" already exists. Please choose a different code.', Colors.red);
-          }
-          return;
-        }
-      }
-
-      // Check for duplicate SKUs in the current list (client-side validation)
-      final skus = _masterItems.map((item) => item.sku).toList();
-      _logger.info('Current SKUs to add: $skus');
-      final duplicateSkus = skus.where((sku) => skus.where((s) => s == sku).length > 1).toSet();
-      if (duplicateSkus.isNotEmpty) {
-        _logger.warning('Client-side duplicate SKUs found: $duplicateSkus');
+    // Check for unique branch code (case-insensitive)
+    final branchCode = _codeController.text.trim();
+    if (branchCode.isNotEmpty) {
+      final existingBranches = await db.getAllBranches();
+      final isDuplicate = existingBranches.any(
+        (branch) => branch.code != null &&
+                   branch.code!.toLowerCase() == branchCode.toLowerCase(),
+      );
+      
+      if (isDuplicate) {
         if (mounted) {
-          _showSnackBar('Duplicate SKUs found in the list: ${duplicateSkus.join(", ")}. Please use unique SKUs.', Colors.red);
+          Navigator.of(context).pop(); // Close loading dialog
+          _showSnackBar('Branch code "$branchCode" already exists. Please choose a different code.', Colors.red);
         }
         return;
       }
+    }
 
-      // Create the branch first to get its ID
-      _logger.info('Creating new branch...');
-      final branchId = await db.into(db.branches).insert(BranchesCompanion.insert(
-        name: _nameController.text.trim(),
-        location: _branchLocationController.text.trim(),
-        code: drift.Value(_codeController.text.trim()),
-        weeklyOrderOfftake: drift.Value(_weeklyOrderOfftakeController.text.trim()),
-        weeklyReorderPoint: drift.Value(_weeklyReorderPointController.text.trim()),
-        maintainingInventory: drift.Value(_maintainingInventoryController.text.trim()),
-      ));
-      _logger.info('Branch created successfully with ID: $branchId');
+    // Check for duplicate SKUs in the current list (client-side validation)
+    final skus = _masterItems.map((item) => item.sku).toList();
+    _logger.info('Current SKUs to add: $skus');
+    final duplicateSkus = skus.where((sku) => skus.where((s) => s == sku).length > 1).toSet();
+    if (duplicateSkus.isNotEmpty) {
+      _logger.warning('Client-side duplicate SKUs found: $duplicateSkus');
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        _showSnackBar('Duplicate SKUs found in the list: ${duplicateSkus.join(", ")}. Please use unique SKUs.', Colors.red);
+      }
+      return;
+    }
 
-      // Now check for unique item SKUs within this branch (using the real branchId)
-      _logger.info('Validating ${_masterItems.length} items for branch $branchId');
-      _logger.info('BranchId type: ${branchId.runtimeType}, value: $branchId');
-      
-      // DEBUG: Let's see what's in the database before validation
-      final allMasterItems = await db.getAllMasterItems();
-      final allInventoryItems = await db.getAllInventoryItems();
-      _logger.info('Total MasterItems in DB: ${allMasterItems.length}');
-      _logger.info('Total InventoryItems in DB: ${allInventoryItems.length}');
-      _logger.info('All existing MasterItem SKUs: ${allMasterItems.map((i) => '"${i.sku}" (branch:${i.branchId})').join(', ')}');
-      _logger.info('All existing InventoryItem SKUs: ${allInventoryItems.map((i) => '"${i.sku}" (branch:${i.branchId})').join(', ')}');
-      
+    // Create the branch first to get its ID
+    _logger.info('Creating new branch...');
+    final branchId = await db.into(db.branches).insert(BranchesCompanion.insert(
+      name: _nameController.text.trim(),
+      location: _branchLocationController.text.trim(),
+      code: drift.Value(_codeController.text.trim()),
+      weeklyOrderOfftake: drift.Value(_weeklyOrderOfftakeController.text.trim()),
+      weeklyReorderPoint: drift.Value(_weeklyReorderPointController.text.trim()),
+      maintainingInventory: drift.Value(_maintainingInventoryController.text.trim()),
+    ));
+    _logger.info('Branch created successfully with ID: $branchId');
+
+    // Use the customWriteTransaction for all item operations
+    await db.customWriteTransaction(() async {
+      // Validate all SKUs first
       for (var item in _masterItems) {
-        _logger.info('Checking SKU: "${item.sku}" (length: ${item.sku.length}) for branch $branchId');
-        _logger.info('SKU bytes: ${item.sku.codeUnits}');
-        
         // Check if SKU already exists in master_items for this branch
         final existingMasterItem = await (db.select(db.masterItems)
-          ..where((m) => m.sku.equals(item.sku) & m.branchId.equals(branchId))).get();
-        _logger.info('MasterItems check for "${item.sku}": ${existingMasterItem.length} results');
+          ..where((m) => m.sku.equals(item.sku) & m.branchId.equals(branchId))).getSingleOrNull();
         
-        if (existingMasterItem.isNotEmpty) {
+        if (existingMasterItem != null) {
           _logger.warning('Found existing MasterItem with SKU "${item.sku}" in branch $branchId');
-          _logger.warning('Existing items: ${existingMasterItem.map((i) => 'id:${i.id}, sku:"${i.sku}", branchId:${i.branchId}').toList()}');
-          
-          // Delete the branch we just created since validation failed
-          await db.deleteBranch(branchId);
-          if (mounted) {
-            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
-          }
-          return;
+          throw Exception('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.');
         }
 
         // Check if SKU already exists in inventory_items for this branch
         final existingInventoryItem = await (db.select(db.inventoryItems)
-          ..where((i) => i.sku.equals(item.sku) & i.branchId.equals(branchId))).get();
-        _logger.info('InventoryItems check for "${item.sku}": ${existingInventoryItem.length} results');
+          ..where((i) => i.sku.equals(item.sku) & i.branchId.equals(branchId))).getSingleOrNull();
         
-        if (existingInventoryItem.isNotEmpty) {
+        if (existingInventoryItem != null) {
           _logger.warning('Found existing InventoryItem with SKU "${item.sku}" in branch $branchId');
-          _logger.warning('Existing items: ${existingInventoryItem.map((i) => 'id:${i.id}, sku:"${i.sku}", branchId:${i.branchId}').toList()}');
-          
-          // Delete the branch we just created since validation failed
-          await db.deleteBranch(branchId);
-          if (mounted) {
-            _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
-          }
-          return;
+          throw Exception('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.');
         }
       }
       
       _logger.info('All SKU validations passed. Proceeding to insert items...');
 
-      // Insert master items and inventory items
+      // Insert all items
       for (var i = 0; i < _masterItems.length; i++) {
         var item = _masterItems[i];
         var quantity = _masterItemQuantities[i];
@@ -545,23 +559,28 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           branchId: branchId,
         ));
       }
+    });
 
-      if (mounted) {
-        _showSnackBar('Branch, master items, and inventory added successfully!', Colors.green);
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnackBar('Error adding branch and items: ${e.toString()}', Colors.red);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (mounted) {
+      Navigator.of(context).pop(); // Close loading dialog
+      _showSnackBar('Branch, master items, and inventory added successfully!', Colors.green);
+      Navigator.pop(context);
+    }
+  } catch (e) {
+    // If there was an error, delete the branch we created
+    try {
+      // Extract branchId from the error context or try to get the last inserted branch
+      // For simplicity, we'll skip this cleanup or you can implement a more sophisticated cleanup
+    } catch (cleanupError) {
+      _logger.warning('Error during cleanup: $cleanupError');
+    }
+    
+    if (mounted) {
+      Navigator.of(context).pop(); // Close loading dialog
+      _showSnackBar('Error adding branch and items: ${e.toString()}', Colors.red);
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

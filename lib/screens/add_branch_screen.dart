@@ -6,6 +6,7 @@ import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:logging/logging.dart';
 import 'package:drift/drift.dart' as drift;
 
@@ -31,9 +32,101 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   final _brandController = TextEditingController();
   final _quantityController = TextEditingController();
   bool _isLoading = false;
+  bool _isCodeValidating = false;
   bool _addingItem = false;
   final List<MasterItem> _masterItems = [];
   final List<int> _masterItemQuantities = [];
+  String? _codeErrorMessage;
+
+  bool get _isFormValid {
+    return _formKey.currentState?.validate() == true &&
+           _masterItems.isNotEmpty &&
+           _codeErrorMessage == null &&
+           !_isCodeValidating;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _codeController.addListener(_onCodeChanged);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _branchLocationController.dispose();
+    _codeController.removeListener(_onCodeChanged);
+    _codeController.dispose();
+    _weeklyOrderOfftakeController.dispose();
+    _weeklyReorderPointController.dispose();
+    _maintainingInventoryController.dispose();
+    _skuController.dispose();
+    _descriptionController.dispose();
+    _brandController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  Timer? _codeValidationTimer;
+
+  void _onCodeChanged() {
+    // Clear previous error when user starts typing
+    if (_codeErrorMessage != null && _codeController.text.isNotEmpty) {
+      setState(() {
+        _codeErrorMessage = null;
+      });
+    }
+
+    // Debounce the validation
+    _codeValidationTimer?.cancel();
+    _codeValidationTimer = Timer(const Duration(milliseconds: 800), () {
+      _validateBranchCodeRealtime();
+    });
+  }
+
+  Future<void> _validateBranchCodeRealtime() async {
+    final code = _codeController.text.trim();
+    
+    // Skip validation if code is too short or empty
+    if (code.length < 2) {
+      if (mounted) {
+        setState(() {
+          _codeErrorMessage = null;
+          _isCodeValidating = false;
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _isCodeValidating = true;
+      _codeErrorMessage = null;
+    });
+
+    try {
+      final existingBranches = await AppDatabase.instance.getAllBranches();
+      final isDuplicate = existingBranches.any(
+        (branch) => branch.code != null &&
+                   branch.code!.toLowerCase() == code.toLowerCase(),
+      );
+
+      if (mounted) {
+        setState(() {
+          _isCodeValidating = false;
+          _codeErrorMessage = isDuplicate
+              ? 'Branch code "$code" already exists. Please choose a different code.'
+              : null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCodeValidating = false;
+          _codeErrorMessage = null;
+        });
+      }
+    }
+  }
 
   void _showSnackBar(String message, Color backgroundColor) {
     if (mounted) {
@@ -333,17 +426,37 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     try {
       final db = AppDatabase.instance;
 
-      // Check for unique branch code
-      final existingBranch = await (db.select(db.branches)
-        ..where((b) => b.code.equals(_codeController.text.trim()))).get();
-      if (existingBranch.isNotEmpty) {
+      // Check for unique branch code (case-insensitive)
+      final branchCode = _codeController.text.trim();
+      if (branchCode.isNotEmpty) {
+        final existingBranches = await db.getAllBranches();
+        final isDuplicate = existingBranches.any(
+          (branch) => branch.code != null &&
+                     branch.code!.toLowerCase() == branchCode.toLowerCase(),
+        );
+        
+        if (isDuplicate) {
+          if (mounted) {
+            _showSnackBar('Branch code "$branchCode" already exists. Please choose a different code.', Colors.red);
+          }
+          return;
+        }
+      }
+
+      // Check for duplicate SKUs in the current list (client-side validation)
+      final skus = _masterItems.map((item) => item.sku).toList();
+      _logger.info('Current SKUs to add: $skus');
+      final duplicateSkus = skus.where((sku) => skus.where((s) => s == sku).length > 1).toSet();
+      if (duplicateSkus.isNotEmpty) {
+        _logger.warning('Client-side duplicate SKUs found: $duplicateSkus');
         if (mounted) {
-          _showSnackBar('Branch code already exists. Please choose a different code.', Colors.red);
+          _showSnackBar('Duplicate SKUs found in the list: ${duplicateSkus.join(", ")}. Please use unique SKUs.', Colors.red);
         }
         return;
       }
 
       // Create the branch first to get its ID
+      _logger.info('Creating new branch...');
       final branchId = await db.into(db.branches).insert(BranchesCompanion.insert(
         name: _nameController.text.trim(),
         location: _branchLocationController.text.trim(),
@@ -352,13 +465,35 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         weeklyReorderPoint: drift.Value(_weeklyReorderPointController.text.trim()),
         maintainingInventory: drift.Value(_maintainingInventoryController.text.trim()),
       ));
+      _logger.info('Branch created successfully with ID: $branchId');
 
-      // Check for unique item SKUs within this branch and insert items
+      // Now check for unique item SKUs within this branch (using the real branchId)
+      _logger.info('Validating ${_masterItems.length} items for branch $branchId');
+      _logger.info('BranchId type: ${branchId.runtimeType}, value: $branchId');
+      
+      // DEBUG: Let's see what's in the database before validation
+      final allMasterItems = await db.getAllMasterItems();
+      final allInventoryItems = await db.getAllInventoryItems();
+      _logger.info('Total MasterItems in DB: ${allMasterItems.length}');
+      _logger.info('Total InventoryItems in DB: ${allInventoryItems.length}');
+      _logger.info('All existing MasterItem SKUs: ${allMasterItems.map((i) => '"${i.sku}" (branch:${i.branchId})').join(', ')}');
+      _logger.info('All existing InventoryItem SKUs: ${allInventoryItems.map((i) => '"${i.sku}" (branch:${i.branchId})').join(', ')}');
+      
       for (var item in _masterItems) {
+        _logger.info('Checking SKU: "${item.sku}" (length: ${item.sku.length}) for branch $branchId');
+        _logger.info('SKU bytes: ${item.sku.codeUnits}');
+        
         // Check if SKU already exists in master_items for this branch
         final existingMasterItem = await (db.select(db.masterItems)
           ..where((m) => m.sku.equals(item.sku) & m.branchId.equals(branchId))).get();
+        _logger.info('MasterItems check for "${item.sku}": ${existingMasterItem.length} results');
+        
         if (existingMasterItem.isNotEmpty) {
+          _logger.warning('Found existing MasterItem with SKU "${item.sku}" in branch $branchId');
+          _logger.warning('Existing items: ${existingMasterItem.map((i) => 'id:${i.id}, sku:"${i.sku}", branchId:${i.branchId}').toList()}');
+          
+          // Delete the branch we just created since validation failed
+          await db.deleteBranch(branchId);
           if (mounted) {
             _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
           }
@@ -368,13 +503,22 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         // Check if SKU already exists in inventory_items for this branch
         final existingInventoryItem = await (db.select(db.inventoryItems)
           ..where((i) => i.sku.equals(item.sku) & i.branchId.equals(branchId))).get();
+        _logger.info('InventoryItems check for "${item.sku}": ${existingInventoryItem.length} results');
+        
         if (existingInventoryItem.isNotEmpty) {
+          _logger.warning('Found existing InventoryItem with SKU "${item.sku}" in branch $branchId');
+          _logger.warning('Existing items: ${existingInventoryItem.map((i) => 'id:${i.id}, sku:"${i.sku}", branchId:${i.branchId}').toList()}');
+          
+          // Delete the branch we just created since validation failed
+          await db.deleteBranch(branchId);
           if (mounted) {
             _showSnackBar('Item SKU "${item.sku}" already exists in this branch. Please use a different SKU.', Colors.red);
           }
           return;
         }
       }
+      
+      _logger.info('All SKU validations passed. Proceeding to insert items...');
 
       // Insert master items and inventory items
       for (var i = 0; i < _masterItems.length; i++) {
@@ -417,21 +561,6 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         });
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _branchLocationController.dispose();
-    _codeController.dispose();
-    _weeklyOrderOfftakeController.dispose();
-    _weeklyReorderPointController.dispose();
-    _maintainingInventoryController.dispose();
-    _skuController.dispose();
-    _descriptionController.dispose();
-    _brandController.dispose();
-    _quantityController.dispose();
-    super.dispose();
   }
 
   @override
@@ -566,14 +695,28 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                 ),
                                 prefixIcon: Icon(
                                   Icons.code,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  color: _isCodeValidating
+                                      ? Colors.orange
+                                      : (isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                                 ),
+                                suffixIcon: _isCodeValidating
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : (_codeErrorMessage != null
+                                        ? Icon(Icons.error, color: Colors.red)
+                                        : null),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 filled: true,
                                 fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                errorText: _codeErrorMessage,
+                                errorMaxLines: 2,
                               ),
+                              autovalidateMode: AutovalidateMode.onUserInteraction,
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Please enter a branch code';
@@ -868,13 +1011,13 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: (_isLoading || _masterItems.isEmpty) ? null : _saveBranch,
-        backgroundColor: _masterItems.isEmpty
+        onPressed: (_isLoading || !_isFormValid) ? null : _saveBranch,
+        backgroundColor: !_isFormValid
             ? Colors.grey
             : (isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4)),
         label: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
-            : (_masterItems.isEmpty
+            : (!_isFormValid
                 ? const Text('Add Items First')
                 : const Text('Add Branch')),
         icon: const Icon(Icons.add),

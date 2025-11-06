@@ -113,6 +113,73 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+// Add this method to your AppDatabase class in app_database.dart
+Future<void> customWriteTransaction(Future<void> Function() action) async {
+  await transaction<void>(() async {
+    await action();
+  });
+}
+
+// Fixed batch insert method - use proper table references
+Future<void> batchInsertMasterAndInventoryItems(
+  List<MasterItem> items, // Renamed parameter to avoid conflict
+  List<int> quantities,
+  int branchId,
+) async {
+  await transaction(() async {
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      final quantity = quantities[i];
+
+      // Insert into master_items - use the actual table from database
+      await into(masterItems).insert(MasterItemsCompanion.insert(
+        sku: item.sku,
+        description: item.description,
+        location: item.location,
+        brand: item.brand != null ? Value(item.brand) : const Value.absent(),
+        branchId: branchId,
+      ));
+
+      // Insert into inventory_items - use the actual table from database
+      await into(inventoryItems).insert(InventoryItemsCompanion.insert(
+        sku: item.sku,
+        description: item.description,
+        end: quantity,
+        location: item.location,
+        brand: item.brand != null ? Value(item.brand) : const Value.absent(),
+        dateAdded: DateTime.now().toIso8601String(),
+        branchId: branchId,
+      ));
+    }
+  });
+}
+
+// Add this optimized validation method
+Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId) async {
+  final result = <String, bool>{};
+  
+  await transaction(() async {
+    // Get all existing SKUs in this branch in one query
+    final existingMasterSkus = await (select(masterItems)
+      ..where((m) => m.branchId.equals(branchId) & m.sku.isIn(skus)))
+      .get()
+      .then((items) => items.map((item) => item.sku).toSet());
+    
+    final existingInventorySkus = await (select(inventoryItems)
+      ..where((i) => i.branchId.equals(branchId) & i.sku.isIn(skus)))
+      .get()
+      .then((items) => items.map((item) => item.sku).toSet());
+    
+    final allExistingSkus = {...existingMasterSkus, ...existingInventorySkus};
+    
+    for (final sku in skus) {
+      result[sku] = !allExistingSkus.contains(sku);
+    }
+  });
+  
+  return result;
+}
+
   // Database connection helper
   static QueryExecutor _openConnection() {
     if (kIsWeb) {

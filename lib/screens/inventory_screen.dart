@@ -94,7 +94,7 @@ Future<void> _loadInventoryItems() async {
 
     try {
       final items = await AppDatabase.instance.getInventoryItemsByBranch(
-        _selectedBranch!.id!,
+        _selectedBranch!.id,
       );
       if (mounted) {
         List<InventoryItem> filteredItems = items;
@@ -271,7 +271,7 @@ Future<void> _loadInventoryItems() async {
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                    color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -1078,7 +1078,7 @@ await AppDatabase.instance
                               elevation: 4,
                               shadowColor: const Color(
                                 0xFF0651A4,
-                              ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                              ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                             ),
                             child: isLoading
                                 ? const SizedBox(
@@ -1479,13 +1479,13 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                 color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                                ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                        ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.inventory,
                                                       color: Color(0xFF0651A4),

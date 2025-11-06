@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/screens/order_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({super.key});
@@ -12,12 +13,28 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
+  String? _selectedBranch;
+  String? _selectedProduct;
+  String? _selectedLocation;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  List<Branch> _branches = [];
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     // Refresh orders when screen is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().loadOrders();
+      _loadBranches();
+    });
+  }
+
+  Future<void> _loadBranches() async {
+    final branches = await AppDatabase.instance.getAllBranches();
+    setState(() {
+      _branches = branches;
     });
   }
 
@@ -26,9 +43,45 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Consumer<OrderProvider>(
       builder: (context, orderProvider, child) {
-        final orders = orderProvider.orders;
+        final allOrders = orderProvider.orders;
         final screenWidth = MediaQuery.of(context).size.width;
         final isSmallScreen = screenWidth < 600;
+
+        // Filter orders based on selected branch, product, location, date range, and search query
+        final orders = allOrders.where((order) {
+          final branchMatch = _selectedBranch == null || order.branchId.toString() == _selectedBranch;
+          final productMatch = _selectedProduct == null || order.brand == _selectedProduct;
+          final locationMatch = _selectedLocation == null || order.location == _selectedLocation;
+
+          // Date range filter
+          bool dateMatch = true;
+          if (_startDate != null || _endDate != null) {
+            try {
+              final orderDate = DateTime.parse(order.dateOrdered);
+              if (_startDate != null && orderDate.isBefore(_startDate!)) {
+                dateMatch = false;
+              }
+              if (_endDate != null && orderDate.isAfter(_endDate!)) {
+                dateMatch = false;
+              }
+            } catch (e) {
+              // If date parsing fails, exclude the order if date filter is active
+              dateMatch = false;
+            }
+          }
+
+          // Search filter
+          final searchMatch = _searchQuery.isEmpty ||
+              order.brand.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              order.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              order.itemId.toString().toLowerCase().contains(_searchQuery.toLowerCase());
+
+          return branchMatch && productMatch && locationMatch && dateMatch && searchMatch;
+        }).toList();
+
+        // Get unique branches and products for filter dropdowns
+        final branchIds = allOrders.map((o) => o.branchId).toSet().toList()..sort();
+        final products = allOrders.map((o) => o.brand).toSet().toList()..sort();
 
         // Group orders by batchId
         final orderBatches = <String, List<Order>>{};
@@ -147,9 +200,59 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 ),
                               ),
                             ),
+                            IconButton(
+                              onPressed: () => _showFilterDialog(context, branchIds, products, allOrders),
+                              icon: Icon(
+                                Icons.filter_list,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
                           ],
                         ),
                       ),
+                      // Search TextField
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Search Orders',
+                            labelStyle: TextStyle(
+                              color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                            ),
+                            hintText: 'Search by brand, location, or item ID',
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: isDarkMode ? Colors.grey[700] : Colors.white,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Expanded(
                         child: batchList.isEmpty
                             ? Center(
@@ -336,25 +439,50 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 12),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 6,
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(15),
+                                                    ),
+                                                    child: Text(
+                                                      'Tap to view order details',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                              ),
-                                              child: Text(
-                                                'Tap to view order details',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                  fontStyle: FontStyle.italic,
                                                 ),
-                                              ),
+                                                const SizedBox(width: 8),
+                                                IconButton(
+                                                  onPressed: () => _editOrderBatch(batchOrders),
+                                                  icon: Icon(
+                                                    Icons.edit,
+                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: 'Edit Order',
+                                                ),
+                                                IconButton(
+                                                  onPressed: () => _deleteOrderBatch(batchOrders),
+                                                  icon: Icon(
+                                                    Icons.delete,
+                                                    color: Colors.red,
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: 'Delete Order',
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -398,6 +526,536 @@ class _OrderListScreenState extends State<OrderListScreen> {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+
+  void _showFilterDialog(BuildContext context, List<int> branchIds, List<String> products, List<Order> allOrders) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    // Local variables for dialog state
+    String? localSelectedBranch = _selectedBranch;
+    String? localSelectedProduct = _selectedProduct;
+    String? localSelectedLocation = _selectedLocation;
+    DateTime? localStartDate = _startDate;
+    DateTime? localEndDate = _endDate;
+
+    // Get unique locations for filter dropdown
+    final locations = allOrders.map((o) => o.location).toSet().toList()..sort();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.filter_list, color: Colors.white, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Filter Orders',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Branch Filter
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by Branch',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              color: isDarkMode ? Colors.grey[700] : Colors.white,
+                            ),
+                            child: DropdownButton<String>(
+                              value: localSelectedBranch,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              hint: const Text('Select Branch'),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('All Branches'),
+                                ),
+                                ...branchIds.map((branchId) {
+                                  final branch = _branches.firstWhere(
+                                    (b) => b.id == branchId,
+                                    orElse: () => Branch(id: branchId, name: 'Branch $branchId', location: ''),
+                                  );
+                                  return DropdownMenuItem<String>(
+                                    value: branchId.toString(),
+                                    child: Text(branch.name),
+                                  );
+                                }),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  localSelectedBranch = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Product Filter
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by Product',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              color: isDarkMode ? Colors.grey[700] : Colors.white,
+                            ),
+                            child: DropdownButton<String>(
+                              value: localSelectedProduct,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              hint: const Text('Select Product'),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('All Products'),
+                                ),
+                                ...products.map((product) => DropdownMenuItem<String>(
+                                  value: product,
+                                  child: Text(product),
+                                )),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  localSelectedProduct = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Location Filter
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by Location',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                              color: isDarkMode ? Colors.grey[700] : Colors.white,
+                            ),
+                            child: DropdownButton<String>(
+                              value: localSelectedLocation,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              hint: const Text('Select Location'),
+                              items: [
+                                const DropdownMenuItem<String>(
+                                  value: null,
+                                  child: Text('All Locations'),
+                                ),
+                                ...locations.map((location) => DropdownMenuItem<String>(
+                                  value: location,
+                                  child: Text(location),
+                                )),
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  localSelectedLocation = value;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Date Range Filter
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by Date Range',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Start Date',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: localStartDate ?? DateTime.now(),
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            localStartDate = picked;
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                          ),
+                                          borderRadius: BorderRadius.circular(10),
+                                          color: isDarkMode ? Colors.grey[700] : Colors.white,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today,
+                                              size: 16,
+                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                localStartDate != null
+                                                    ? '${localStartDate!.day}/${localStartDate!.month}/${localStartDate!.year}'
+                                                    : 'Select Start Date',
+                                                style: TextStyle(
+                                                  color: localStartDate != null
+                                                      ? (isDarkMode ? Colors.white : Colors.black)
+                                                      : Colors.grey.shade500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'End Date',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () async {
+                                        final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: localEndDate ?? DateTime.now(),
+                                          firstDate: DateTime(2020),
+                                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                                        );
+                                        if (picked != null) {
+                                          setState(() {
+                                            localEndDate = picked;
+                                          });
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
+                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                          ),
+                                          borderRadius: BorderRadius.circular(10),
+                                          color: isDarkMode ? Colors.grey[700] : Colors.white,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today,
+                                              size: 16,
+                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                localEndDate != null
+                                                    ? '${localEndDate!.day}/${localEndDate!.month}/${localEndDate!.year}'
+                                                    : 'Select End Date',
+                                                style: TextStyle(
+                                                  color: localEndDate != null
+                                                      ? (isDarkMode ? Colors.white : Colors.black)
+                                                      : Colors.grey.shade500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                localSelectedBranch = null;
+                                localSelectedProduct = null;
+                                localSelectedLocation = null;
+                                localStartDate = null;
+                                localEndDate = null;
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                              foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                            child: const Text('Clear Filters'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Apply filters and close dialog
+                              this.setState(() {
+                                _selectedBranch = localSelectedBranch;
+                                _selectedProduct = localSelectedProduct;
+                                _selectedLocation = localSelectedLocation;
+                                _startDate = localStartDate;
+                                _endDate = localEndDate;
+                              });
+                              Navigator.of(context).pop();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              elevation: 4,
+                              shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
+                            ),
+                            child: const Text(
+                              'Apply',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editOrderBatch(List<Order> batchOrders) {
+    // Navigate to order screen with pre-filled data for editing
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderScreen(editBatch: batchOrders),
+      ),
+    ).then((_) {
+      // Refresh orders after returning from edit screen
+      context.read<OrderProvider>().loadOrders();
+    });
+  }
+
+  void _deleteOrderBatch(List<Order> batchOrders) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          title: Text(
+            'Delete Order Batch',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete this order batch with ${batchOrders.length} items?',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  for (final order in batchOrders) {
+                    await AppDatabase.instance.deleteOrder(order.id);
+                  }
+                  // Refresh the orders list
+                  if (mounted) {
+                    context.read<OrderProvider>().loadOrders();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Order batch deleted successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error deleting order batch: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

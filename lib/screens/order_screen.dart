@@ -8,11 +8,13 @@ import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({super.key});
+   final List<Order>? editBatch;
 
-  @override
-  State<OrderScreen> createState() => _OrderScreenState();
-}
+   const OrderScreen({super.key, this.editBatch});
+
+   @override
+   State<OrderScreen> createState() => _OrderScreenState();
+ }
 
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -31,7 +33,11 @@ class _OrderScreenState extends State<OrderScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (widget.editBatch != null) {
+      _loadEditData();
+    } else {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
@@ -51,6 +57,39 @@ class _OrderScreenState extends State<OrderScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _loadEditData() async {
+    if (widget.editBatch == null || widget.editBatch!.isEmpty) return;
+
+    final firstOrder = widget.editBatch!.first;
+
+    // Wait for branches to be loaded if not already loaded
+    if (_branches.isEmpty) {
+      await _loadData();
+    }
+
+    // Find the branch for this order
+    final branch = _branches.firstWhere(
+      (b) => b.id == firstOrder.branchId,
+      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
+    );
+
+    setState(() {
+      _selectedBranch = branch;
+      _locationController.text = firstOrder.location;
+    });
+
+    // Load master items for the branch
+    await _loadMasterItems();
+
+    // Pre-fill quantities from the edit batch
+    for (final order in widget.editBatch!) {
+      if (_orderQuantities.containsKey(order.itemId)) {
+        _quantityControllers[order.itemId]?.text = order.quantity.toString();
+        _orderQuantities[order.itemId] = order.quantity;
       }
     }
   }
@@ -132,9 +171,33 @@ class _OrderScreenState extends State<OrderScreen> {
       _isLoading = true;
     });
 
-    // Generate a unique batch ID for this order session
-    final batchId = DateTime.now().millisecondsSinceEpoch.toString();
-    
+    // If editing, delete existing orders first
+    if (widget.editBatch != null) {
+      try {
+        for (final order in widget.editBatch!) {
+          await AppDatabase.instance.deleteOrder(order.id);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating orders: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+
+    // Generate a unique batch ID for this order session (or use existing if editing)
+    final batchId = widget.editBatch != null
+        ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
+        : DateTime.now().millisecondsSinceEpoch.toString();
+
     // Preserve the location value before form reset
     final savedLocation = _locationController.text.trim();
 
@@ -149,7 +212,7 @@ class _OrderScreenState extends State<OrderScreen> {
           brand: item.brand ?? '',
           itemId: item.id ?? 0,
           quantity: quantity,
-          dateOrdered: DateTime.now().toIso8601String(),
+          dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
           status: const drift.Value('pending'),
           batchId: drift.Value(batchId),
         );
@@ -183,11 +246,18 @@ class _OrderScreenState extends State<OrderScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${orderCompanions.length} order(s) submitted successfully!'),
+          content: Text(widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!'),
           backgroundColor: Colors.green,
         ),
       );
-      // Reset form
+
+      // If editing, go back to order list
+      if (widget.editBatch != null) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      // Reset form for new orders
       _formKey.currentState!.reset();
       // Don't clear location - keep it for continuity
       // Clear quantities
@@ -314,7 +384,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            'Create Order',
+                            widget.editBatch != null ? 'Edit Order' : 'Create Order',
                             style: TextStyle(
                               fontSize: 28.0,
                               fontWeight: FontWeight.bold,
@@ -395,7 +465,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         ),
                                       ),
                                       child: DropdownButtonFormField<Branch>(
-                                        value: _selectedBranch,
+                                        initialValue: _selectedBranch,
                                         decoration: InputDecoration(
                                           labelText: 'Branch *',
                                           labelStyle: TextStyle(
@@ -786,7 +856,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                _isLoading ? 'Submitting...' : 'Submit Order',
+                                _isLoading ? 'Submitting...' : (widget.editBatch != null ? 'Update Order' : 'Submit Order'),
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

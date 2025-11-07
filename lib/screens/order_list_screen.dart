@@ -568,413 +568,415 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     ),
                   ],
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.filter_list, color: Colors.white, size: 28),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Filter Orders',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Branch Filter
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Filter by Branch',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              color: isDarkMode ? Colors.grey[700] : Colors.white,
-                            ),
-                            child: DropdownButton<String>(
-                              value: localSelectedBranch,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              hint: const Text('Select Branch'),
-                              items: [
-                                const DropdownMenuItem<String>(
-                                  value: null,
-                                  child: Text('All Branches'),
-                                ),
-                                ...branchIds.map((branchId) {
-                                  final branch = _branches.firstWhere(
-                                    (b) => b.id == branchId,
-                                    orElse: () => Branch(id: branchId, name: 'Branch $branchId', location: ''),
-                                  );
-                                  return DropdownMenuItem<String>(
-                                    value: branchId.toString(),
-                                    child: Text(branch.name),
-                                  );
-                                }),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  localSelectedBranch = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Product Filter
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Filter by Product',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              color: isDarkMode ? Colors.grey[700] : Colors.white,
-                            ),
-                            child: DropdownButton<String>(
-                              value: localSelectedProduct,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              hint: const Text('Select Product'),
-                              items: [
-                                const DropdownMenuItem<String>(
-                                  value: null,
-                                  child: Text('All Products'),
-                                ),
-                                ...products.map((product) => DropdownMenuItem<String>(
-                                  value: product,
-                                  child: Text(product),
-                                )),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  localSelectedProduct = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Location Filter
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Filter by Location',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              color: isDarkMode ? Colors.grey[700] : Colors.white,
-                            ),
-                            child: DropdownButton<String>(
-                              value: localSelectedLocation,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              hint: const Text('Select Location'),
-                              items: [
-                                const DropdownMenuItem<String>(
-                                  value: null,
-                                  child: Text('All Locations'),
-                                ),
-                                ...locations.map((location) => DropdownMenuItem<String>(
-                                  value: location,
-                                  child: Text(location),
-                                )),
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  localSelectedLocation = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Date Range Filter
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Filter by Date Range',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Start Date',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    InkWell(
-                                      onTap: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: localStartDate ?? DateTime.now(),
-                                          firstDate: DateTime(2020),
-                                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                                        );
-                                        if (picked != null) {
-                                          setState(() {
-                                            localStartDate = picked;
-                                          });
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
-                                          ),
-                                          borderRadius: BorderRadius.circular(10),
-                                          color: isDarkMode ? Colors.grey[700] : Colors.white,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.calendar_today,
-                                              size: 16,
-                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                localStartDate != null
-                                                    ? '${localStartDate!.day}/${localStartDate!.month}/${localStartDate!.year}'
-                                                    : 'Select Start Date',
-                                                style: TextStyle(
-                                                  color: localStartDate != null
-                                                      ? (isDarkMode ? Colors.white : Colors.black)
-                                                      : Colors.grey.shade500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'End Date',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    InkWell(
-                                      onTap: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: localEndDate ?? DateTime.now(),
-                                          firstDate: DateTime(2020),
-                                          lastDate: DateTime.now().add(const Duration(days: 365)),
-                                        );
-                                        if (picked != null) {
-                                          setState(() {
-                                            localEndDate = picked;
-                                          });
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
-                                          ),
-                                          borderRadius: BorderRadius.circular(10),
-                                          color: isDarkMode ? Colors.grey[700] : Colors.white,
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Icon(
-                                              Icons.calendar_today,
-                                              size: 16,
-                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                localEndDate != null
-                                                    ? '${localEndDate!.day}/${localEndDate!.month}/${localEndDate!.year}'
-                                                    : 'Select End Date',
-                                                style: TextStyle(
-                                                  color: localEndDate != null
-                                                      ? (isDarkMode ? Colors.white : Colors.black)
-                                                      : Colors.grey.shade500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                localSelectedBranch = null;
-                                localSelectedProduct = null;
-                                localSelectedLocation = null;
-                                localStartDate = null;
-                                localEndDate = null;
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
-                              foregroundColor: isDarkMode ? Colors.white : Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                            ),
-                            child: const Text('Clear Filters'),
-                          ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Apply filters and close dialog
-                              this.setState(() {
-                                _selectedBranch = localSelectedBranch;
-                                _selectedProduct = localSelectedProduct;
-                                _selectedLocation = localSelectedLocation;
-                                _startDate = localStartDate;
-                                _endDate = localEndDate;
-                              });
-                              Navigator.of(context).pop();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.filter_list, color: Colors.white, size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Filter Orders',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
-                              elevation: 4,
-                              shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                             ),
-                            child: const Text(
-                              'Apply',
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Branch Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Branch',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                color: isDarkMode ? Colors.grey[700] : Colors.white,
+                              ),
+                              child: DropdownButton<String>(
+                                value: localSelectedBranch,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text('Select Branch'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Branches'),
+                                  ),
+                                  ...branchIds.map((branchId) {
+                                    final branch = _branches.firstWhere(
+                                      (b) => b.id == branchId,
+                                      orElse: () => Branch(id: branchId, name: 'Branch $branchId', location: ''),
+                                    );
+                                    return DropdownMenuItem<String>(
+                                      value: branchId.toString(),
+                                      child: Text(branch.name),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    localSelectedBranch = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Product Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Product',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                color: isDarkMode ? Colors.grey[700] : Colors.white,
+                              ),
+                              child: DropdownButton<String>(
+                                value: localSelectedProduct,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text('Select Product'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Products'),
+                                  ),
+                                  ...products.map((product) => DropdownMenuItem<String>(
+                                    value: product,
+                                    child: Text(product),
+                                  )),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    localSelectedProduct = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Location Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Location',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                color: isDarkMode ? Colors.grey[700] : Colors.white,
+                              ),
+                              child: DropdownButton<String>(
+                                value: localSelectedLocation,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text('Select Location'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Locations'),
+                                  ),
+                                  ...locations.map((location) => DropdownMenuItem<String>(
+                                    value: location,
+                                    child: Text(location),
+                                  )),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    localSelectedLocation = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Date Range Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Date Range',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Start Date',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      InkWell(
+                                        onTap: () async {
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate: localStartDate ?? DateTime.now(),
+                                            firstDate: DateTime(2020),
+                                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                                          );
+                                          if (picked != null) {
+                                            setState(() {
+                                              localStartDate = picked;
+                                            });
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                            ),
+                                            borderRadius: BorderRadius.circular(10),
+                                            color: isDarkMode ? Colors.grey[700] : Colors.white,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_today,
+                                                size: 16,
+                                                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  localStartDate != null
+                                                      ? '${localStartDate!.day}/${localStartDate!.month}/${localStartDate!.year}'
+                                                      : 'Select Start Date',
+                                                  style: TextStyle(
+                                                    color: localStartDate != null
+                                                        ? (isDarkMode ? Colors.white : Colors.black)
+                                                        : Colors.grey.shade500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'End Date',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      InkWell(
+                                        onTap: () async {
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate: localEndDate ?? DateTime.now(),
+                                            firstDate: DateTime(2020),
+                                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                                          );
+                                          if (picked != null) {
+                                            setState(() {
+                                              localEndDate = picked;
+                                            });
+                                          }
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                            ),
+                                            borderRadius: BorderRadius.circular(10),
+                                            color: isDarkMode ? Colors.grey[700] : Colors.white,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.calendar_today,
+                                                size: 16,
+                                                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  localEndDate != null
+                                                      ? '${localEndDate!.day}/${localEndDate!.month}/${localEndDate!.year}'
+                                                      : 'Select End Date',
+                                                  style: TextStyle(
+                                                    color: localEndDate != null
+                                                        ? (isDarkMode ? Colors.white : Colors.black)
+                                                        : Colors.grey.shade500,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  localSelectedBranch = null;
+                                  localSelectedProduct = null;
+                                  localSelectedLocation = null;
+                                  localStartDate = null;
+                                  localEndDate = null;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                                foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              child: const Text('Clear Filters'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // Apply filters and close dialog
+                                this.setState(() {
+                                  _selectedBranch = localSelectedBranch;
+                                  _selectedProduct = localSelectedProduct;
+                                  _selectedLocation = localSelectedLocation;
+                                  _startDate = localStartDate;
+                                  _endDate = localEndDate;
+                                });
+                                Navigator.of(context).pop();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                elevation: 4,
+                                shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
+                              ),
+                              child: const Text(
+                                'Apply',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
 import 'package:warehouse_inventory/screens/master_data_screen.dart';
+import 'package:warehouse_inventory/screens/order_list_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -100,17 +101,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final masterItems = await AppDatabase.instance.getMasterItemsByBranch(branch.id);
       final items = await AppDatabase.instance.getInventoryItemsByBranch(branch.id);
       final orders = await AppDatabase.instance.getOrdersByBranch(branch.id);
-      
+
       int totalMaster = masterItems.length;
       // Parse maintainingInventory as int, default to 10 if null or invalid
-      int maintainingInventory = branch.maintainingInventory != null 
-          ? int.tryParse(branch.maintainingInventory!) ?? 10 
+      int maintainingInventory = branch.maintainingInventory != null
+          ? int.tryParse(branch.maintainingInventory!) ?? 10
           : 10;
       int lowStockThreshold = maintainingInventory - 1;
       int lowStock = items.where((item) => item.end <= lowStockThreshold).length;
       int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
       int totalOrders = orders.length;
-      
+
       setState(() {
         _totalMasterItems = totalMaster;
         _totalInventoryQuantity = totalInventoryQuantity;
@@ -133,6 +134,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     }
+  }
+
+  List<List<Order>> _getOrderBatches() {
+    final orderBatches = <String, List<Order>>{};
+    for (final order in _orders) {
+      final batchId = order.batchId ?? 'single_${order.id}';
+      if (!orderBatches.containsKey(batchId)) {
+        orderBatches[batchId] = [];
+      }
+      orderBatches[batchId]!.add(order);
+    }
+
+    final batchList = orderBatches.values.toList()
+      ..sort((a, b) => b.first.dateOrdered.compareTo(a.first.dateOrdered));
+
+    return batchList;
   }
 
   @override
@@ -284,7 +301,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   _totalOrders.toString(),
                                   Icons.shopping_cart,
                                   Colors.purple.shade400,
-                                  null,
+                                  () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (context) => const OrderListScreen()),
+                                  ),
                                 ),
                                 const SizedBox(width: 16.0),
                                 _buildAnimatedInfoCard(
@@ -312,32 +332,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 constraints: const BoxConstraints(maxHeight: 200),
                                 child: ListView.builder(
                                   shrinkWrap: true,
-                                  itemCount: _orders.length,
+                                  itemCount: _getOrderBatches().length,
                                   itemBuilder: (context, index) {
-                                    final order = _orders[index];
+                                    final batch = _getOrderBatches()[index];
+                                    final firstOrder = batch.first;
+                                    final totalItems = batch.length;
+                                    final totalQuantity = batch.fold(0, (sum, order) => sum + order.quantity);
+
                                     // Parse date string to DateTime for display
                                     DateTime? orderDate;
                                     try {
-                                      orderDate = DateTime.parse(order.dateOrdered);
+                                      orderDate = DateTime.parse(firstOrder.dateOrdered);
                                     } catch (e) {
                                       orderDate = null;
                                     }
+
                                     return Card(
                                       margin: const EdgeInsets.symmetric(vertical: 4.0),
-                                      child: ListTile(
-                                        leading: Icon(
-                                          Icons.shopping_cart,
-                                          color: Colors.green.shade600,
+                                      child: InkWell(
+                                        onTap: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => OrderListScreen(initialBatchId: firstOrder.batchId ?? 'single_${firstOrder.id}'),
+                                          ),
                                         ),
-                                        title: Text('${order.brand} - Item ${order.itemId}'),
-                                        subtitle: Text('Quantity: ${order.quantity} • Status: ${order.status}'),
-                                        trailing: Text(
-                                          orderDate != null 
-                                              ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
-                                              : order.dateOrdered,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey.shade600,
+                                        child: ListTile(
+                                          leading: Icon(
+                                            Icons.inventory_2,
+                                            color: Colors.green.shade600,
+                                          ),
+                                          title: Text('Order Batch • $totalItems item${totalItems > 1 ? 's' : ''}'),
+                                          subtitle: Text('Total: $totalQuantity units • Status: ${firstOrder.status}'),
+                                          trailing: Text(
+                                            orderDate != null
+                                                ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
+                                                : firstOrder.dateOrdered,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
                                           ),
                                         ),
                                       ),

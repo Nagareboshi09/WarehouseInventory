@@ -301,10 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   _totalOrders.toString(),
                                   Icons.shopping_cart,
                                   Colors.purple.shade400,
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const OrderListScreen()),
-                                  ),
+                                  null,
                                 ),
                                 const SizedBox(width: 16.0),
                                 _buildAnimatedInfoCard(

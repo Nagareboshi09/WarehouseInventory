@@ -371,7 +371,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
-                                builder: (_) => const HomeScreen(initialIndex: 4),
+                                builder: (_) => const HomeScreen(initialIndex: 0),
                               ),
                             );
                           },

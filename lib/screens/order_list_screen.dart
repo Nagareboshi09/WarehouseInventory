@@ -6,7 +6,9 @@ import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
-  const OrderListScreen({super.key});
+  final String? initialBatchId;
+
+  const OrderListScreen({super.key, this.initialBatchId});
 
   @override
   State<OrderListScreen> createState() => _OrderListScreenState();
@@ -20,10 +22,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
   DateTime? _endDate;
   List<Branch> _branches = [];
   String _searchQuery = '';
+  String? _filterBatchId;
 
   @override
   void initState() {
     super.initState();
+    _filterBatchId = widget.initialBatchId;
     // Refresh orders when screen is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<OrderProvider>().loadOrders();
@@ -52,6 +56,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           final branchMatch = _selectedBranch == null || order.branchId.toString() == _selectedBranch;
           final productMatch = _selectedProduct == null || order.brand == _selectedProduct;
           final locationMatch = _selectedLocation == null || order.location == _selectedLocation;
+          final batchMatch = _filterBatchId == null || (order.batchId ?? 'single_${order.id}') == _filterBatchId;
 
           // Date range filter
           bool dateMatch = true;
@@ -76,7 +81,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               order.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
               order.itemId.toString().toLowerCase().contains(_searchQuery.toLowerCase());
 
-          return branchMatch && productMatch && locationMatch && dateMatch && searchMatch;
+          return branchMatch && productMatch && locationMatch && batchMatch && dateMatch && searchMatch;
         }).toList();
 
         // Get unique branches and products for filter dropdowns

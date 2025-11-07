@@ -157,7 +157,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                     builder: (_) =>
-                                        const OrderScreen(),
+                                        const HomeScreen(initialIndex: 0),
                                   ),
                                 );
                               },

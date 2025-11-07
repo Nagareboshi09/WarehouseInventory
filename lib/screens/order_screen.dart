@@ -369,7 +369,11 @@ class _OrderScreenState extends State<OrderScreen> {
                       children: [
                         IconButton(
                           onPressed: () {
-                            Navigator.of(context).pop();
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => const HomeScreen(initialIndex: 4),
+                              ),
+                            );
                           },
                           icon: Icon(
                             Icons.arrow_back,

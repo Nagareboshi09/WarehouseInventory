@@ -608,12 +608,12 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             Positioned(
               top: 100,
               left: 50,
-              child: Container(
+              child: Container( 
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: .05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -625,7 +625,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: .08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -637,7 +637,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: .05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -649,7 +649,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: .06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -663,11 +663,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                     children: [
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: .95) : Colors.white.withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -878,11 +878,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                       // Master Items Section
                       Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                          color: isDarkMode ? Colors.grey[850]!.withValues(alpha: .95) : Colors.white.withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),
@@ -959,7 +959,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                     color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                     ),
                                   ),
                                   padding: const EdgeInsets.all(16),

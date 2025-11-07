@@ -279,7 +279,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Colors.blue.shade400,
                                   () => Navigator.push(
                                     context,
-                                    MaterialPageRoute(builder: (context) => const MasterDataScreen()),
+                                    MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
                                   ),
                                 ),
                                 const SizedBox(width: 16.0),

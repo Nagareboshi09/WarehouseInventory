@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
+import 'package:logging/logging.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
@@ -21,6 +22,7 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  final Logger _logger = Logger('InventoryScreen');
   List<InventoryItem> _inventoryItems = [];
   List<InventoryItem> _filteredItems = [];
   List<Branch> _branches = [];
@@ -34,7 +36,37 @@ class _InventoryScreenState extends State<InventoryScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeLogger();
     _loadBranches();
+  }
+
+  void _initializeLogger() {
+    // Configure logging level based on environment
+    Logger.root.level = Level.INFO; // Set to Level.ALL for debug, Level.INFO for production
+    
+    // Set up logging listener for console output
+    Logger.root.onRecord.listen((LogRecord record) {
+      final timestamp = record.time.toIso8601String().split('T')[1].split('.')[0];
+      final level = record.level.name.padRight(7);
+      final loggerName = record.loggerName.padRight(15);
+      final message = record.message;
+      
+      // Use different emojis for different log levels
+      final emoji = switch (record.level.name) {
+        'FINE' || 'FINER' || 'FINEST' => '🔍',
+        'INFO' => 'ℹ️',
+        'WARNING' => '⚠️',
+        'SEVERE' => '❌',
+        _ => '📝',
+      };
+      
+      print('$emoji $timestamp [$level] $loggerName: $message');
+      
+      // Log stack trace for errors
+      if (record.level >= Level.SEVERE && record.stackTrace != null) {
+        print('Stack trace: ${record.stackTrace}');
+      }
+    });
   }
 
 Future<void> _loadBranches() async {
@@ -156,21 +188,21 @@ Future<void> _loadInventoryItems() async {
 // Test method to debug the export process
   void _testInventoryData() {
     if (_selectedBranch == null) {
-      print('❌ No branch selected');
+      _logger.fine('❌ No branch selected');
       return;
     }
-    
+     
     if (_inventoryItems.isEmpty) {
-      print('❌ No inventory items found for branch: ${_selectedBranch!.name}');
-      print('Branch ID: ${_selectedBranch!.id}');
+      _logger.warning('❌ No inventory items found for branch: ${_selectedBranch!.name}');
+      _logger.fine('Branch ID: ${_selectedBranch!.id}');
       return;
     }
-    
-    print('✅ Data verification:');
-    print('Branch: ${_selectedBranch!.name}');
-    print('Total items: ${_inventoryItems.length}');
-    print('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
-    print('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
+     
+    _logger.info('✅ Data verification:');
+    _logger.fine('Branch: ${_selectedBranch!.name}');
+    _logger.fine('Total items: ${_inventoryItems.length}');
+    _logger.fine('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
+    _logger.fine('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
   }
 
   Future<void> _exportInventoryToFile() async {
@@ -233,10 +265,10 @@ Future<void> _loadInventoryItems() async {
         final File file = File(filePath);
         
         // Debug: Show the file path for troubleshooting
-        print('✅ Export successful!');
-        print('File saved at: $filePath');
-        print('File exists: ${await file.exists()}');
-        print('File size: ${await file.length()} bytes');
+        _logger.info('✅ Export successful!');
+        _logger.fine('File saved at: $filePath');
+        _logger.fine('File exists: ${await file.exists()}');
+        _logger.fine('File size: ${await file.length()} bytes');
         
         if (mounted) {
           // Show options to user
@@ -247,8 +279,7 @@ Future<void> _loadInventoryItems() async {
       }
       
     } catch (e, stackTrace) {
-      print('Export error: $e');
-      print('Stack trace: $stackTrace');
+      _logger.severe('Export error: $e', e, stackTrace);
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -503,7 +534,7 @@ Future<void> _loadInventoryItems() async {
             savedSuccessfully = true;
           }
         } catch (e) {
-          print('Downloads directory failed: $e');
+          _logger.warning('Downloads directory failed: $e');
         }
       } else {
         // For iOS and other platforms, use Documents directory
@@ -521,7 +552,7 @@ Future<void> _loadInventoryItems() async {
           locationName = 'Documents/Exports folder';
           savedSuccessfully = true;
         } catch (e) {
-          print('Documents directory failed: $e');
+          _logger.warning('Documents directory failed: $e');
         }
       }
       
@@ -535,7 +566,7 @@ Future<void> _loadInventoryItems() async {
           locationName = 'App Documents folder (app-specific)';
           savedSuccessfully = true;
         } catch (e) {
-          print('App storage failed: $e');
+          _logger.warning('App storage failed: $e');
         }
       }
       
@@ -549,7 +580,7 @@ Future<void> _loadInventoryItems() async {
           locationName = 'Temp folder (temporary)';
           savedSuccessfully = true;
         } catch (e) {
-          print('Temp directory failed: $e');
+          _logger.warning('Temp directory failed: $e');
         }
       }
       
@@ -630,43 +661,43 @@ Future<void> _loadInventoryItems() async {
       if (Platform.isAndroid) {
         // For Android 13+ (API 33+) - use MediaStore permissions
         if (await Permission.photos.request().isGranted) {
-          print('✅ Photos permission granted for Android 13+');
+          _logger.info('✅ Photos permission granted for Android 13+');
         }
-        
+         
         // For Android 11+ (API 30+) - use MANAGE_EXTERNAL_STORAGE
         if (await Permission.manageExternalStorage.isGranted) {
-          print('✅ Full storage access granted via MANAGE_EXTERNAL_STORAGE');
+          _logger.info('✅ Full storage access granted via MANAGE_EXTERNAL_STORAGE');
         } else {
           // Try to request MANAGE_EXTERNAL_STORAGE permission
           final manageResult = await Permission.manageExternalStorage.request();
           if (manageResult.isGranted) {
-            print('✅ MANAGE_EXTERNAL_STORAGE permission granted');
+            _logger.info('✅ MANAGE_EXTERNAL_STORAGE permission granted');
           } else {
-            print('⚠️ MANAGE_EXTERNAL_STORAGE denied, will use app-scoped storage');
-            
+            _logger.warning('⚠️ MANAGE_EXTERNAL_STORAGE denied, will use app-scoped storage');
+             
             // For older Android versions, request basic storage
             if (await Permission.storage.request().isGranted) {
-              print('✅ Basic storage permission granted for older Android');
+              _logger.info('✅ Basic storage permission granted for older Android');
             } else {
-              print('⚠️ Basic storage permission denied, using app-specific storage only');
+              _logger.warning('⚠️ Basic storage permission denied, using app-specific storage only');
             }
           }
         }
-        
+         
       } else if (Platform.isIOS) {
         // For iOS, we need to request photos permission for accessing files
         if (await Permission.photos.request().isGranted) {
-          print('✅ Photos permission granted for iOS');
+          _logger.info('✅ Photos permission granted for iOS');
         } else {
-          print('⚠️ Photos permissions denied, will use app-specific directories');
+          _logger.warning('⚠️ Photos permissions denied, will use app-specific directories');
         }
       } else {
         // For other platforms, assume we have permissions
-        print('✅ Non-Android/iOS platform, assuming storage permissions');
+        _logger.info('✅ Non-Android/iOS platform, assuming storage permissions');
       }
     } catch (e) {
       // If permission handling fails, just continue without permissions
-      print('Permission handling error: $e, continuing with app-scoped storage');
+      _logger.severe('Permission handling error: $e, continuing with app-scoped storage', e);
     }
   }
 
@@ -690,7 +721,7 @@ Future<void> _loadInventoryItems() async {
       return true;
     } catch (e) {
       // If permission check fails, assume no permissions
-      print('Permission check error: $e, assuming no permissions');
+      _logger.severe('Permission check error: $e, assuming no permissions', e);
       return false;
     }
   }

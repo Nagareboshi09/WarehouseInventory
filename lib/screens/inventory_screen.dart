@@ -219,8 +219,11 @@ Future<void> _loadInventoryItems() async {
     }
 
     try {
-      // Create file name with current date
-      final String fileName = '${_selectedBranch!.name.replaceAll(' ', '_')}_inventory_${DateTime.now().toIso8601String().split('T')[0]}.xlsx';
+      // Create file name with format: branchCode_branchName_date
+      final String currentDate = DateTime.now().toIso8601String().split('T')[0];
+      final String branchName = _selectedBranch!.name.replaceAll(' ', '_');
+      final String branchCode = _selectedBranch!.code ?? _selectedBranch!.id.toString(); // Use branch code from master data, fallback to ID
+      final String fileName = '${branchCode}_${branchName}_${currentDate}.xlsx';
       
       // Run the export operation
       final exportResult = await _performExportInBackground(_inventoryItems, fileName);

@@ -421,9 +421,12 @@ Future<void> _loadInventoryItems() async {
     String fileName,
   ) async {
     try {
-      // Create Excel workbook and worksheet
+      // Create Excel workbook
       final excel = Excel.createExcel();
-      final sheet = excel['Inventory Data'];
+      
+      // Get the first (default) sheet that Excel creates automatically
+      // DO NOT access by string name to avoid creating additional sheets
+      final sheet = excel.sheets.values.first;
       
       // Add headers
       sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);

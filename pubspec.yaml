@@ -63,6 +63,14 @@ dependencies:
   # Excel/XLSX and CSV file reading
   spreadsheet_decoder: ^2.0.0
   csv: ^5.0.2
+  
+  # Excel generation and file sharing
+  excel: ^2.1.0
+  share_plus: ^7.2.1
+  open_file: ^3.3.2
+  
+  # File permissions and storage
+  permission_handler: ^11.1.0
 
 dev_dependencies:
   flutter_test:

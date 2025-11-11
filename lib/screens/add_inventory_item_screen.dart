@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/widgets/item_form_fields.dart';
+import 'package:excel/excel.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:open_file/open_file.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 class AddInventoryItemScreen extends StatefulWidget {
   final Branch selectedBranch;
@@ -23,6 +31,7 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
   final _locationController = TextEditingController();
   final _brandController = TextEditingController();
   bool _isLoading = false;
+  bool _isExporting = false;
   List<MasterItem> _masterItems = [];
   MasterItem? _selectedMasterItem;
 
@@ -136,6 +145,141 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
         _brandController.clear();
       }
     });
+  }
+
+  Future<void> _exportToExcel() async {
+    if (_isExporting) return;
+
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      // Request storage permissions
+      final status = await Permission.storage.request();
+      if (!status.isGranted) {
+        throw Exception('Storage permission is required to export inventory data.');
+      }
+
+      // Get all inventory items for this branch
+      final inventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
+        widget.selectedBranch.id!,
+      );
+
+      if (inventoryItems.isEmpty) {
+        throw Exception('No inventory items found to export.');
+      }
+
+      // Create Excel workbook
+      final excel = Excel.createExcel();
+      final sheet = excel['Inventory'];
+
+      // Add header row
+      final headers = ['Item ID', 'Name', 'Beginning', 'Previous', 'Updated Quantity', 'End', 'Notes'];
+      sheet.insertRowIterables(headers, 0);
+
+      // Format header row
+      for (int col = 0; col < headers.length; col++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+        cell.cellStyle = CellStyle(
+          bold: true,
+          fontSize: 12,
+        );
+      }
+
+      // Add data rows
+      for (int i = 0; i < inventoryItems.length; i++) {
+        final item = inventoryItems[i];
+        
+        // Compute end quantity if not stored
+        final beginning = item.beg ?? 0;
+        final previous = item.prev ?? 0;
+        final end = item.end;
+        final updatedQuantity = item.sales ?? 0;
+        final computedEnd = beginning + updatedQuantity;
+        final finalEnd = end != null ? end : computedEnd;
+
+        final rowData = [
+          item.sku,
+          item.description,
+          beginning.toString(),
+          previous.toString(),
+          updatedQuantity.toString(),
+          finalEnd.toString(),
+          item.brand ?? '',
+        ];
+
+        sheet.insertRowIterables(rowData, i + 1);
+      }
+
+      // Generate filename with current timestamp
+      final now = DateTime.now();
+      final formatter = DateFormat('yyyyMMdd_HHmmss');
+      final timestamp = formatter.format(now);
+      final filename = 'inventory_${timestamp}.xlsx';
+
+      // Save file
+      final directory = await getExternalStorageDirectory();
+      if (directory == null) {
+        throw Exception('Could not access storage directory.');
+      }
+
+      final file = File('${directory.path}/$filename');
+      final bytes = excel.encode();
+      await file.writeAsBytes(bytes!);
+
+      if (mounted) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Excel file exported successfully: $filename'),
+            backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () => _openFile(file),
+            ),
+          ),
+        );
+
+        // Share the file
+        await Share.shareXFiles(
+          [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+          subject: 'Inventory Export - ${widget.selectedBranch.name}',
+          text: 'Inventory data exported from ${widget.selectedBranch.name}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error exporting Excel file: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  void _openFile(File file) async {
+    try {
+      await OpenFile.open(file.path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening file: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -449,6 +593,26 @@ class _AddInventoryItemScreenState extends State<AddInventoryItemScreen> {
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isExporting ? null : _exportToExcel,
+        backgroundColor: _isExporting ? Colors.grey : Colors.blue,
+        foregroundColor: Colors.white,
+        icon: _isExporting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.download),
+        label: Text(
+          _isExporting ? 'Exporting...' : 'Export Excel',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        tooltip: 'Export inventory to Excel',
       ),
     );
   }

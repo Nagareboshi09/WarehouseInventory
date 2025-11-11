@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
-import 'package:drift/drift.dart' as drift;
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
-import 'add_inventory_item_screen.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:share_plus/share_plus.dart';
+import 'package:open_file/open_file.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
@@ -25,6 +27,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Branch? _selectedBranch;
   bool _isLoading = true;
   bool _branchSelected = false;
+  bool _isExporting = false; // Prevent multiple concurrent exports
   String _searchQuery = '';
   String _branchSearchQuery = '';
 
@@ -150,92 +153,585 @@ Future<void> _loadInventoryItems() async {
     });
   }
 
-  Future<void> _exportInventoryToFile() async {
-    if (_selectedBranch == null || _inventoryItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No inventory data to export'),
-          backgroundColor: Colors.red,
-        ),
-      );
+// Test method to debug the export process
+  void _testInventoryData() {
+    if (_selectedBranch == null) {
+      print('❌ No branch selected');
       return;
     }
+    
+    if (_inventoryItems.isEmpty) {
+      print('❌ No inventory items found for branch: ${_selectedBranch!.name}');
+      print('Branch ID: ${_selectedBranch!.id}');
+      return;
+    }
+    
+    print('✅ Data verification:');
+    print('Branch: ${_selectedBranch!.name}');
+    print('Total items: ${_inventoryItems.length}');
+    print('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
+    print('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
+  }
 
-    try {
-      // Try different storage locations for better compatibility
-      Directory? directory;
-
-      // Try external storage first (Android)
-      try {
-        directory = await getExternalStorageDirectory();
-        if (directory != null) {
-          final downloadDir = Directory('${directory.path}/Download');
-          if (!await downloadDir.exists()) {
-            await downloadDir.create(recursive: true);
-          }
-          directory = downloadDir;
-        }
-      } catch (e) {
-        // Fallback to application documents directory
-        directory = await getApplicationDocumentsDirectory();
-      }
-
-      if (directory == null) {
-        throw Exception('Unable to access storage directory');
-      }
-
-      final fileName = '${_selectedBranch!.name.replaceAll(' ', '_')}_inventory_${DateTime.now().toIso8601String().split('T')[0]}.csv';
-      final file = File('${directory.path}/$fileName');
-
-      // Create CSV header
-      String csvContent = 'SKU,Description,Brand,Location,Quantity,Date Added\n';
-
-      // Add inventory items
-      for (var item in _inventoryItems) {
-        final brand = item.brand ?? 'N/A';
-        // dateAdded is stored as ISO string in drift database
-        final dateAdded = item.dateAdded;
-        csvContent += '${item.sku},"${item.description}",$brand,${item.location},${item.end},$dateAdded\n';
-      }
-
-      await file.writeAsString(csvContent);
-
-      final filePath = '${directory.path}/$fileName';
-
+  Future<void> _exportInventoryToFile() async {
+    // Prevent multiple concurrent exports
+    if (_isExporting) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Inventory exported successfully!\nFile: $fileName\nLocation: ${directory.path}'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 8),
-            action: SnackBarAction(
-              label: 'Show Path',
-              textColor: Colors.white,
-              onPressed: () async {
-                // Show the file path in another snackbar
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('File location: $filePath\nUse your file manager to navigate to this path and open the CSV file.'),
-                      backgroundColor: Colors.blue,
-                      duration: const Duration(seconds: 15),
-                    ),
-                  );
-                }
-              },
-            ),
+          const SnackBar(
+            content: Text('⏳ Export already in progress. Please wait...'),
+            backgroundColor: Colors.orange,
           ),
         );
       }
-    } catch (e) {
+      return;
+    }
+
+    if (_selectedBranch == null || _inventoryItems.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting inventory: ${e.toString()}'),
+          const SnackBar(
+            content: Text('No inventory data to export'),
             backgroundColor: Colors.red,
           ),
         );
       }
+      return;
+    }
+
+    // Test the data before export
+    _testInventoryData();
+
+    // Set exporting flag to prevent concurrent operations
+    setState(() {
+      _isExporting = true;
+    });
+
+    // Show initial loading message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🚀 Creating Excel file...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    try {
+      // Create file name with current date
+      final String fileName = '${_selectedBranch!.name.replaceAll(' ', '_')}_inventory_${DateTime.now().toIso8601String().split('T')[0]}.xlsx';
+      
+      // Run the export operation
+      final exportResult = await _performExportInBackground(_inventoryItems, fileName);
+      
+      if (exportResult['success'] == true) {
+        final String filePath = exportResult['path'];
+        final File file = File(filePath);
+        
+        // Debug: Show the file path for troubleshooting
+        print('✅ Export successful!');
+        print('File saved at: $filePath');
+        print('File exists: ${await file.exists()}');
+        print('File size: ${await file.length()} bytes');
+        
+        if (mounted) {
+          // Show options to user
+          _showExportOptions(file, fileName);
+        }
+      } else {
+        throw Exception(exportResult['error'] ?? 'Unknown export error');
+      }
+      
+    } catch (e, stackTrace) {
+      print('Export error: $e');
+      print('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error exporting inventory: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Try Again',
+              textColor: Colors.white,
+              onPressed: () => _exportInventoryToFile(),
+            ),
+          ),
+        );
+      }
+    } finally {
+      // Always reset the exporting flag
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  // Show export options dialog
+  void _showExportOptions(File file, String fileName) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          title: Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Export Complete!',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Excel file created successfully!',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'File: $fileName',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Items exported: ${_inventoryItems.length}',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'What would you like to do?',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await Share.shareXFiles(
+                    [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+                    subject: 'Inventory Export - ${_selectedBranch!.name}',
+                    text: 'Here is the inventory export for ${_selectedBranch!.name}',
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error sharing file: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0651A4),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.share, size: 20),
+              label: const Text('Share'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await OpenFile.open(file.path);
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error opening file: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.open_in_new, size: 20),
+              label: const Text('Open'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Perform the actual export operation in background to prevent UI blocking
+  Future<Map<String, dynamic>> _performExportInBackground(
+    List<InventoryItem> items,
+    String fileName,
+  ) async {
+    try {
+      // Create Excel workbook and worksheet
+      final excel = Excel.createExcel();
+      final sheet = excel['Inventory Data'];
+      
+      // Add headers
+      sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
+      
+      // Add data rows - simplified to avoid batch processing issues
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final brand = item.brand ?? 'N/A';
+        final description = item.description;
+        final beg = item.beg?.toString() ?? 'N/A';
+        final prev = item.prev?.toString() ?? 'N/A';
+        final sales = item.sales?.toString() ?? 'N/A';
+        
+        sheet.appendRow([
+          item.sku,
+          description,
+          brand,
+          item.location.toString(),
+          item.end.toString(),
+          beg,
+          prev,
+          sales
+        ]);
+        
+        // Add small delay every 100 items to prevent UI blocking
+        if (i % 100 == 0) {
+          await Future.delayed(const Duration(milliseconds: 1));
+        }
+      }
+
+      // Encode Excel data once
+      final bytes = excel.encode();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Failed to encode Excel file');
+      }
+
+      // Try multiple storage locations with proper error handling
+      String savePath = '';
+      String locationName = '';
+      bool savedSuccessfully = false;
+      
+      if (Platform.isAndroid) {
+        // Method 1: Try public Downloads directory (Android 10+ scoped storage)
+        try {
+          // Check if we have MANAGE_EXTERNAL_STORAGE permission
+          if (await Permission.manageExternalStorage.isGranted) {
+            final downloadsDir = await getDownloadsDirectory();
+            if (downloadsDir != null) {
+              final warehouseDir = Directory('${downloadsDir.path}/WarehouseInventory');
+              
+              if (!await warehouseDir.exists()) {
+                await warehouseDir.create(recursive: true);
+              }
+              
+              final file = File('${warehouseDir.path}/$fileName');
+              await file.writeAsBytes(bytes);
+              savePath = file.absolute.path;
+              locationName = 'Downloads/WarehouseInventory folder (PUBLIC)';
+              savedSuccessfully = true;
+            }
+          } else {
+            // Use app-scoped downloads directory (no special permissions needed)
+            final appDir = await getApplicationDocumentsDirectory();
+            final downloadsDir = Directory('${appDir.path}/downloads');
+            
+            if (!await downloadsDir.exists()) {
+              await downloadsDir.create(recursive: true);
+            }
+            
+            final file = File('${downloadsDir.path}/$fileName');
+            await file.writeAsBytes(bytes);
+            savePath = file.absolute.path;
+            locationName = 'App downloads folder (app-scoped)';
+            savedSuccessfully = true;
+          }
+        } catch (e) {
+          print('Downloads directory failed: $e');
+        }
+      } else {
+        // For iOS and other platforms, use Documents directory
+        try {
+          final documentsDir = await getApplicationDocumentsDirectory();
+          final exportsDir = Directory('${documentsDir.path}/Exports');
+          
+          if (!await exportsDir.exists()) {
+            await exportsDir.create(recursive: true);
+          }
+          
+          final file = File('${exportsDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'Documents/Exports folder';
+          savedSuccessfully = true;
+        } catch (e) {
+          print('Documents directory failed: $e');
+        }
+      }
+      
+      // Method 2: Try app-specific directory (if public storage failed)
+      if (!savedSuccessfully) {
+        try {
+          final appDir = await getApplicationDocumentsDirectory();
+          final file = File('${appDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'App Documents folder (app-specific)';
+          savedSuccessfully = true;
+        } catch (e) {
+          print('App storage failed: $e');
+        }
+      }
+      
+      // Method 3: Try temp directory (last resort)
+      if (!savedSuccessfully) {
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final file = File('${tempDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'Temp folder (temporary)';
+          savedSuccessfully = true;
+        } catch (e) {
+          print('Temp directory failed: $e');
+        }
+      }
+      
+      if (savedSuccessfully) {
+        return {
+          'success': true,
+          'path': savePath,
+          'location': locationName,
+        };
+      } else {
+        return {
+          'success': false,
+          'error': 'Unable to save file. Please check permissions and storage space.',
+        };
+      }
+      
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+  void _showXlsxAccessInstructions(String filePath, String locationName) {
+    String message = '';
+    Color backgroundColor = Colors.blue;
+    
+    if (locationName.contains('Downloads')) {
+      message = '📁 How to find your XLSX file:\n\n'
+          '📂 ANDROID:\n'
+          '1. Open "Files" or "My Files" app\n'
+          '2. Tap "Browse" → "Internal storage" or "Downloads"\n'
+          '3. Go to "Download" → "WarehouseInventory"\n'
+          '4. Find your XLSX file (e.g., Ace_Hardware_SM_North_inventory_2025-11-11.xlsx)\n'
+          '5. Tap to open in Excel/Sheets\n\n'
+          '💡 The XLSX file contains all your inventory data and can be opened in Microsoft Excel, Google Sheets, or any spreadsheet app!';
+      backgroundColor = Colors.green;
+    } else if (locationName.contains('Documents')) {
+      message = '📁 How to find your XLSX file:\n\n'
+          ' iOS:\n'
+          '1. Open "Files" app\n'
+          '2. Tap "Browse" → "On My iPhone" → "Documents" → "Exports"\n'
+          '3. Find your XLSX file\n'
+          '4. Tap to open\n\n'
+          '💡 The XLSX file contains all your inventory data and can be opened in Microsoft Excel, Google Sheets, or any spreadsheet app!';
+      backgroundColor = Colors.green;
+    } else {
+      message = '📁 How to find your XLSX file:\n\n'
+          '⚠️ NOTE: File saved to $locationName\n\n'
+          '📂 ANDROID:\n'
+          '1. Open "Files" or "My Files" app\n'
+          '2. Tap "Browse" → "Internal storage"\n'
+          '3. Go to "Android" → "data" → "com.warehouseinv.warehouse_inventory" → "files" → "Temporary"\n'
+          '4. Find your XLSX file\n'
+          '5. Tap to open in Excel/Sheets\n\n'
+          '📱 iOS:\n'
+          '1. Open "Files" app\n'
+          '2. Tap "Browse" → "On My iPhone" → "Temporary"\n'
+          '3. Find your XLSX file\n'
+          '4. Tap to open\n\n'
+          '💡 Note: Files in temp folder may be deleted when the app is updated.';
+      backgroundColor = Colors.orange;
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: Duration(seconds: 30),
+      ),
+    );
+  }
+
+  // Request storage permissions with simplified approach
+  Future<void> _requestStoragePermissions() async {
+    try {
+      if (Platform.isAndroid) {
+        // For Android 13+ (API 33+) - use MediaStore permissions
+        if (await Permission.photos.request().isGranted) {
+          print('✅ Photos permission granted for Android 13+');
+        }
+        
+        // For Android 11+ (API 30+) - use MANAGE_EXTERNAL_STORAGE
+        if (await Permission.manageExternalStorage.isGranted) {
+          print('✅ Full storage access granted via MANAGE_EXTERNAL_STORAGE');
+        } else {
+          // Try to request MANAGE_EXTERNAL_STORAGE permission
+          final manageResult = await Permission.manageExternalStorage.request();
+          if (manageResult.isGranted) {
+            print('✅ MANAGE_EXTERNAL_STORAGE permission granted');
+          } else {
+            print('⚠️ MANAGE_EXTERNAL_STORAGE denied, will use app-scoped storage');
+            
+            // For older Android versions, request basic storage
+            if (await Permission.storage.request().isGranted) {
+              print('✅ Basic storage permission granted for older Android');
+            } else {
+              print('⚠️ Basic storage permission denied, using app-specific storage only');
+            }
+          }
+        }
+        
+      } else if (Platform.isIOS) {
+        // For iOS, we need to request photos permission for accessing files
+        if (await Permission.photos.request().isGranted) {
+          print('✅ Photos permission granted for iOS');
+        } else {
+          print('⚠️ Photos permissions denied, will use app-specific directories');
+        }
+      } else {
+        // For other platforms, assume we have permissions
+        print('✅ Non-Android/iOS platform, assuming storage permissions');
+      }
+    } catch (e) {
+      // If permission handling fails, just continue without permissions
+      print('Permission handling error: $e, continuing with app-scoped storage');
+    }
+  }
+
+  // Check if we have proper storage permissions with error handling
+  Future<bool> _hasStoragePermissions() async {
+    try {
+      if (Platform.isAndroid) {
+        // For Android 13+, check MANAGE_EXTERNAL_STORAGE
+        if (await Permission.manageExternalStorage.isGranted) {
+          return true;
+        }
+        // For older Android versions, check regular storage permission
+        return await Permission.storage.isGranted;
+      }
+      
+      if (Platform.isIOS) {
+        return await Permission.photos.isGranted;
+      }
+      
+      // For other platforms, assume we have permissions
+      return true;
+    } catch (e) {
+      // If permission check fails, assume no permissions
+      print('Permission check error: $e, assuming no permissions');
+      return false;
+    }
+  }
+
+  // Open app settings
+  void _openAppSettings() {
+    openAppSettings();
+  }
+
+  // Show file location info
+  void _showFileLocationInfo(String filePath) {
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('File Location Information'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('File saved at: $filePath'),
+                const SizedBox(height: 16),
+                const Text(
+                  'To access your file:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text('1. Open your device\'s Files app'),
+                const Text('2. Navigate to the path shown above'),
+                const Text('3. Look for the Excel file with today\'s date'),
+                const SizedBox(height: 16),
+                const Text(
+                  '💡 Tip: You can copy this file to your computer via USB cable or cloud storage apps.',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
     }
   }
 
@@ -1558,6 +2054,25 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
           ],
         ),
       ),
+floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _isExporting ? null : _exportInventoryToFile,
+              backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.download),
+              label: Text(_isExporting ? 'Exporting...' : 'Export to XLSX'),
+            )
+          : null,
     );
   }
 

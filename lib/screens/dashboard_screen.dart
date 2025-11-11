@@ -270,48 +270,64 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                             const SizedBox(height: 24.0),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                _buildAnimatedInfoCard(
-                                  'Total Items',
-                                  _totalMasterItems.toString(),
-                                  Icons.inventory,
-                                  Colors.blue.shade400,
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    child: _buildAnimatedInfoCard(
+                                      'Total Items',
+                                      _totalMasterItems.toString(),
+                                      Icons.inventory,
+                                      Colors.blue.shade400,
+                                      () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch)),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 16.0),
-                                _buildAnimatedInfoCard(
-                                  'Total Inventory',
-                                  _totalInventoryQuantity.toString(),
-                                  Icons.storage,
-                                  Colors.green.shade400,
-                                  null,
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    child: _buildAnimatedInfoCard(
+                                      'Total Inventory',
+                                      _totalInventoryQuantity.toString(),
+                                      Icons.storage,
+                                      Colors.green.shade400,
+                                      null,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 24.0),
+                            const SizedBox(height: 16.0),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                _buildAnimatedInfoCard(
-                                  'Total Orders',
-                                  _totalOrders.toString(),
-                                  Icons.shopping_cart,
-                                  Colors.purple.shade400,
-                                  null,
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    child: _buildAnimatedInfoCard(
+                                      'Total Orders',
+                                      _totalOrders.toString(),
+                                      Icons.shopping_cart,
+                                      Colors.purple.shade400,
+                                      null,
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(width: 16.0),
-                                _buildAnimatedInfoCard(
-                                  'Low Stock Items',
-                                  _lowStockItems.toString(),
-                                  Icons.warning,
-                                  Colors.orange.shade400,
-                                  () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch, showLowStockOnly: true)),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                                    child: _buildAnimatedInfoCard(
+                                      'Low Stock Items',
+                                      _lowStockItems.toString(),
+                                      Icons.warning,
+                                      Colors.orange.shade400,
+                                      () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => InventoryScreen(initialBranch: _selectedBranch, showLowStockOnly: true)),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -329,6 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 constraints: const BoxConstraints(maxHeight: 200),
                                 child: ListView.builder(
                                   shrinkWrap: true,
+                                  physics: const ClampingScrollPhysics(),
                                   itemCount: _getOrderBatches().length,
                                   itemBuilder: (context, index) {
                                     final batch = _getOrderBatches()[index];
@@ -345,7 +362,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     }
 
                                     return Card(
-                                      margin: const EdgeInsets.symmetric(vertical: 4.0),
+                                      margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 2.0),
                                       child: InkWell(
                                         onTap: () => Navigator.push(
                                           context,
@@ -353,21 +370,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                             builder: (context) => OrderListScreen(initialBatchId: firstOrder.batchId ?? 'single_${firstOrder.id}'),
                                           ),
                                         ),
-                                        child: ListTile(
-                                          leading: Icon(
-                                            Icons.inventory_2,
-                                            color: Colors.green.shade600,
-                                          ),
-                                          title: Text('Order Batch • $totalItems item${totalItems > 1 ? 's' : ''}'),
-                                          subtitle: Text('Total: $totalQuantity units • Status: ${firstOrder.status}'),
-                                          trailing: Text(
-                                            orderDate != null
-                                                ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
-                                                : firstOrder.dateOrdered,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey.shade600,
-                                            ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.inventory_2,
+                                                color: Colors.green.shade600,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 12.0),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Order Batch • $totalItems item${totalItems > 1 ? 's' : ''}',
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 2.0),
+                                                    Text(
+                                                      'Total: $totalQuantity units • Status: ${firstOrder.status}',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors.grey.shade600,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                constraints: const BoxConstraints(maxWidth: 80),
+                                                child: Text(
+                                                  orderDate != null
+                                                      ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
+                                                      : firstOrder.dateOrdered,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  textAlign: TextAlign.end,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ),
@@ -408,8 +459,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            width: 150,
-            padding: const EdgeInsets.all(16.0),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12.0),
               gradient: LinearGradient(
@@ -429,18 +480,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Icon(
                     icon,
                     key: ValueKey(icon),
-                    size: 40,
+                    size: 36,
                     color: color,
                   ),
                 ),
                 const SizedBox(height: 8.0),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                Flexible(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 4.0),
                 AnimatedSwitcher(
@@ -449,7 +503,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     value,
                     key: ValueKey(value),
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: color,
                     ),

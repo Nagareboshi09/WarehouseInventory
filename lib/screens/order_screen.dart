@@ -639,7 +639,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                             ),
                                                           ),
                                                         ),
-                                                        const SizedBox(width: 12),
+                                                        const Spacer(),
                                                         Expanded(
                                                           child: Column(
                                                             crossAxisAlignment:
@@ -656,7 +656,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                                                       color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                                                     ),
                                                               ),
-                                                              Row(
+                                                              Wrap(
                                                                 children: [
                                                                   Text(
                                                                     'SKU: ${item.sku}',
@@ -690,9 +690,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                                     const SizedBox(height: 12),
                                                     Row(
                                                       children: [
-                                                        Expanded(
+                                                        Flexible(
                                                           child: Container(
-                                                            height: 60,
                                                             padding: const EdgeInsets.all(8),
                                                             decoration: BoxDecoration(
                                                               color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
@@ -746,9 +745,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                                           ),
                                                         ),
                                                         const SizedBox(width: 12),
-                                                        Expanded(
+                                                        Flexible(
                                                           child: Container(
-                                                            height: 60,
                                                             padding: const EdgeInsets.all(8),
                                                             decoration: BoxDecoration(
                                                               color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,

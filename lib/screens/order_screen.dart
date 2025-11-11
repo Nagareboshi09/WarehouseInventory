@@ -85,6 +85,20 @@ class _OrderScreenState extends State<OrderScreen> {
     // Load master items for the branch
     await _loadMasterItems();
 
+    // Filter to only show items that are in the edit batch
+    final editBatchItemIds = widget.editBatch!.map((order) => order.itemId).toSet();
+    setState(() {
+      _filteredItems = _masterItems.where((item) => editBatchItemIds.contains(item.id)).toList();
+      
+      // Initialize controllers only for items in the edit batch
+      _quantityControllers.clear();
+      _orderQuantities.clear();
+      for (var item in _filteredItems) {
+        _quantityControllers[item.id ?? 0] = TextEditingController();
+        _orderQuantities[item.id ?? 0] = 0;
+      }
+    });
+
     // Pre-fill quantities from the edit batch
     for (final order in widget.editBatch!) {
       if (_orderQuantities.containsKey(order.itemId)) {
@@ -203,7 +217,9 @@ class _OrderScreenState extends State<OrderScreen> {
 
     // Create orders for each item with quantity > 0
     List<OrdersCompanion> orderCompanions = [];
-    for (var item in _masterItems) {
+    // Use filtered items if editing, otherwise use all master items
+    final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
+    for (var item in itemsToProcess) {
       int quantity = _orderQuantities[item.id ?? 0] ?? 0;
       if (quantity > 0) {
         final orderCompanion = OrdersCompanion.insert(
@@ -266,8 +282,16 @@ class _OrderScreenState extends State<OrderScreen> {
       }
       setState(() {
         _orderQuantities.clear();
-        for (var item in _masterItems) {
-          _orderQuantities[item.id ?? 0] = 0;
+        if (widget.editBatch != null) {
+          // For editing mode, reset only the filtered items
+          for (var item in _filteredItems) {
+            _orderQuantities[item.id ?? 0] = 0;
+          }
+        } else {
+          // For new orders, reset all master items
+          for (var item in _masterItems) {
+            _orderQuantities[item.id ?? 0] = 0;
+          }
         }
         _searchQuery = '';
         _filteredItems = _masterItems;
@@ -551,44 +575,47 @@ class _OrderScreenState extends State<OrderScreen> {
                                     if (_selectedBranch != null &&
                                         _masterItems.isNotEmpty) ...[
                                       Text(
-                                        'Select Items to Order',
+                                        widget.editBatch != null
+                                            ? 'Ordered Items (${_filteredItems.length})'
+                                            : 'Select Items to Order',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                                      if (widget.editBatch == null) ...[
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: TextField(
+                                            decoration: InputDecoration(
+                                              labelText: 'Search Items',
+                                              labelStyle: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                              ),
+                                              hintText:
+                                                  'Search by SKU, name, or brand',
+                                              prefixIcon: Icon(
+                                                Icons.search,
+                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                              ),
+                                              border: InputBorder.none,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 12,
+                                                  ),
+                                            ),
+                                            onChanged: _filterItems,
                                           ),
                                         ),
-                                        child: TextField(
-                                          decoration: InputDecoration(
-                                            labelText: 'Search Items',
-                                            labelStyle: TextStyle(
-                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                            ),
-                                            hintText:
-                                                'Search by SKU, name, or brand',
-                                            prefixIcon: Icon(
-                                              Icons.search,
-                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                            ),
-                                            border: InputBorder.none,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 16,
-                                                  vertical: 12,
-                                                ),
-                                          ),
-                                          onChanged: _filterItems,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
+                                        const SizedBox(height: 12),
+                                      ],
                                       Container(
                                         height: 300,
                                         decoration: BoxDecoration(

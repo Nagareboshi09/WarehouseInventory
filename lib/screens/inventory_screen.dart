@@ -953,69 +953,136 @@ Future<void> _loadInventoryItems() async {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.business,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.business,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Branch:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Branch: ${_selectedBranch?.name ?? 'Unknown'}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.name ?? 'Unknown'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.shopping_cart,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.shopping_cart,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Weekly Order Offtake:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Weekly Order Offtake: ${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.warning,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.warning,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Weekly Reorder Point:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Weekly Reorder Point: ${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Row(
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.inventory,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.inventory,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Maintaining Inventory:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Maintaining Inventory: ${_selectedBranch?.maintainingInventory ?? 'N/A'}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.maintainingInventory ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
                               ),
                             ),
                           ],

@@ -576,25 +576,32 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        
         return Dialog(
           backgroundColor: Colors.transparent,
           elevation: 0,
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDarkMode ? const Color(0xFF2D2D2D) : Colors.white,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(),
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Adding Branch and ${_masterItems.length} Items...',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -602,7 +609,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                   'This may take a few moments',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: isDarkMode ? Colors.white70 : Colors.grey[600]!,
                   ),
                 ),
               ],

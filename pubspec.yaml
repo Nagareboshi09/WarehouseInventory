@@ -72,6 +72,9 @@ dependencies:
   # File permissions and storage
   permission_handler: ^11.1.0
   
+  # Device information for Android compatibility
+  device_info_plus: ^9.1.1
+  
   # Performance optimization for large file processing
   async: ^2.11.0
   # Updated to latest stable version for better compatibility with Kotlin 2.1.0+ and Flutter v2

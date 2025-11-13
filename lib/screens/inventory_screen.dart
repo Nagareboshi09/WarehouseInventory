@@ -10,6 +10,7 @@ import 'package:excel/excel.dart' hide Border;
 import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 import 'package:logging/logging.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
@@ -459,6 +460,13 @@ Future<void> _loadInventoryItems() async {
       // DO NOT access by string name to avoid creating additional sheets
       final sheet = excel.sheets.values.first;
       
+      // Sort items by brand name A-Z for better organization
+      items.sort((a, b) {
+        final brandA = (a.brand ?? 'N/A').toLowerCase();
+        final brandB = (b.brand ?? 'N/A').toLowerCase();
+        return brandA.compareTo(brandB);
+      });
+      
       // Add headers
       sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
       
@@ -500,41 +508,90 @@ Future<void> _loadInventoryItems() async {
       bool savedSuccessfully = false;
       
       if (Platform.isAndroid) {
-        // Method 1: Try public Downloads directory (Android 10+ scoped storage)
         try {
-          // Check if we have MANAGE_EXTERNAL_STORAGE permission
-          if (await Permission.manageExternalStorage.isGranted) {
-            final downloadsDir = await getDownloadsDirectory();
-            if (downloadsDir != null) {
-              final warehouseDir = Directory('${downloadsDir.path}/WarehouseInventory');
+          int sdkInt = 28; // Default to Android 9 for safety
+          
+          // Try to get Android version, but don't fail if it doesn't work
+          try {
+            final androidInfo = await DeviceInfoPlugin().androidInfo;
+            sdkInt = androidInfo.version.sdkInt;
+          } catch (e) {
+            _logger.warning('Could not get Android version, using default (Android 9): $e');
+          }
+          
+          // Method 1: For Android 10+ with permissions (scoped storage)
+          if (sdkInt >= 29) {
+            if (await Permission.manageExternalStorage.isGranted) {
+              try {
+                final downloadsDir = await getDownloadsDirectory();
+                if (downloadsDir != null) {
+                  final warehouseDir = Directory('${downloadsDir.path}/WarehouseInventory');
+                  
+                  if (!await warehouseDir.exists()) {
+                    await warehouseDir.create(recursive: true);
+                  }
+                  
+                  final file = File('${warehouseDir.path}/$fileName');
+                  await file.writeAsBytes(bytes);
+                  savePath = file.absolute.path;
+                  locationName = 'Downloads/WarehouseInventory folder (PUBLIC)';
+                  savedSuccessfully = true;
+                  _logger.fine('✅ Saved to public Downloads for Android 10+');
+                }
+              } catch (e) {
+                _logger.warning('Public Downloads failed for Android 10+: $e');
+              }
+            }
+          }
+          
+          // Method 2: Use app-scoped storage (works for all Android versions)
+          if (!savedSuccessfully) {
+            try {
+              final appDir = await getApplicationDocumentsDirectory();
+              final exportsDir = Directory('${appDir.path}/Exports');
               
-              if (!await warehouseDir.exists()) {
-                await warehouseDir.create(recursive: true);
+              if (!await exportsDir.exists()) {
+                await exportsDir.create(recursive: true);
               }
               
-              final file = File('${warehouseDir.path}/$fileName');
+              final file = File('${exportsDir.path}/$fileName');
               await file.writeAsBytes(bytes);
               savePath = file.absolute.path;
-              locationName = 'Downloads/WarehouseInventory folder (PUBLIC)';
+              
+              // Provide clear location name based on Android version
+              if (sdkInt <= 28) {
+                locationName = 'Exports folder (Android 9- compatible)';
+                _logger.fine('✅ Saved to app-scoped Exports for Android 9- compatibility');
+              } else {
+                locationName = 'Exports folder (app-scoped)';
+                _logger.fine('✅ Saved to app-scoped Exports (no permissions needed)');
+              }
               savedSuccessfully = true;
+            } catch (e) {
+              _logger.warning('App-scoped storage failed: $e');
             }
-          } else {
-            // Use app-scoped downloads directory (no special permissions needed)
-            final appDir = await getApplicationDocumentsDirectory();
-            final downloadsDir = Directory('${appDir.path}/downloads');
-            
-            if (!await downloadsDir.exists()) {
-              await downloadsDir.create(recursive: true);
-            }
-            
-            final file = File('${downloadsDir.path}/$fileName');
-            await file.writeAsBytes(bytes);
-            savePath = file.absolute.path;
-            locationName = 'App downloads folder (app-scoped)';
-            savedSuccessfully = true;
           }
         } catch (e) {
-          _logger.warning('Downloads directory failed: $e');
+          _logger.warning('Android-specific storage logic failed: $e');
+          
+          // Fallback: Always try app-scoped storage
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final exportsDir = Directory('${appDir.path}/Exports');
+            
+            if (!await exportsDir.exists()) {
+              await exportsDir.create(recursive: true);
+            }
+            
+            final file = File('${exportsDir.path}/$fileName');
+            await file.writeAsBytes(bytes);
+            savePath = file.absolute.path;
+            locationName = 'Exports folder (universal fallback)';
+            savedSuccessfully = true;
+            _logger.fine('✅ Saved to app-scoped Exports (universal fallback)');
+          } catch (fallbackE) {
+            _logger.warning('Universal fallback failed: $fallbackE');
+          }
         }
       } else {
         // For iOS and other platforms, use Documents directory
@@ -551,34 +608,37 @@ Future<void> _loadInventoryItems() async {
           savePath = file.absolute.path;
           locationName = 'Documents/Exports folder';
           savedSuccessfully = true;
+          _logger.fine('✅ Saved to Documents/Exports for iOS');
         } catch (e) {
           _logger.warning('Documents directory failed: $e');
         }
       }
       
-      // Method 2: Try app-specific directory (if public storage failed)
+      // Method 3: Try app-specific directory (if other methods failed)
       if (!savedSuccessfully) {
         try {
           final appDir = await getApplicationDocumentsDirectory();
           final file = File('${appDir.path}/$fileName');
           await file.writeAsBytes(bytes);
           savePath = file.absolute.path;
-          locationName = 'App Documents folder (app-specific)';
+          locationName = 'App Documents folder (fallback)';
           savedSuccessfully = true;
+          _logger.fine('✅ Saved to App Documents (fallback)');
         } catch (e) {
           _logger.warning('App storage failed: $e');
         }
       }
       
-      // Method 3: Try temp directory (last resort)
+      // Method 4: Try temp directory (last resort)
       if (!savedSuccessfully) {
         try {
           final tempDir = await getTemporaryDirectory();
           final file = File('${tempDir.path}/$fileName');
           await file.writeAsBytes(bytes);
           savePath = file.absolute.path;
-          locationName = 'Temp folder (temporary)';
+          locationName = 'Temp folder (emergency fallback)';
           savedSuccessfully = true;
+          _logger.fine('✅ Saved to Temp folder (emergency)');
         } catch (e) {
           _logger.warning('Temp directory failed: $e');
         }

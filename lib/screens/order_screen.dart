@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:drift/drift.dart' as drift;
 // Using Drift-generated classes instead of old model classes
-import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_list_screen.dart';
 

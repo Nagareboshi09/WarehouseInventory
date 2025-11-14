@@ -84,6 +84,25 @@ class _OrderListScreenState extends State<OrderListScreen> {
           );
 
         return Scaffold(
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const OrderScreen(),
+                ),
+              ).then((_) {
+                // Refresh orders after returning from order screen
+                if (mounted) {
+                  context.read<OrderProvider>().loadOrders();
+                }
+              });
+            },
+            backgroundColor: const Color(0xFF0651A4),
+            foregroundColor: Colors.white,
+            elevation: 6,
+            tooltip: 'Go to Order Screen',
+            child: const Icon(Icons.shopping_cart),
+          ),
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

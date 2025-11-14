@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- Permissions for Excel export functionality -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app needs access to save Excel files to your photo library.</string>
 </dict>
 </plist>

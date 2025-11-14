@@ -1,25 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:warehouse_inventory/models/order.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/screens/order_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
-  const OrderListScreen({super.key});
+  final String? initialBatchId;
+
+  const OrderListScreen({super.key, this.initialBatchId});
 
   @override
   State<OrderListScreen> createState() => _OrderListScreenState();
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
+  String? _selectedBranch;
+  String? _selectedProduct;
+  List<Branch> _branches = [];
+  String _searchQuery = '';
+  String? _filterBatchId;
+
+  @override
+  void initState() {
+    super.initState();
+    _filterBatchId = widget.initialBatchId;
+    // Refresh orders when screen is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<OrderProvider>().loadOrders();
+      _loadBranches();
+    });
+  }
+
+  Future<void> _loadBranches() async {
+    final branches = await AppDatabase.instance.getAllBranches();
+    setState(() {
+      _branches = branches..sort((a, b) => a.id.compareTo(b.id));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Consumer<OrderProvider>(
       builder: (context, orderProvider, child) {
-        final orders = orderProvider.orders;
+        final allOrders = orderProvider.orders;
         final screenWidth = MediaQuery.of(context).size.width;
         final isSmallScreen = screenWidth < 600;
+
+        // Filter orders based on selected branch, product, and search query
+        final orders = allOrders.where((order) {
+          final branchMatch = _selectedBranch == null || order.branchId.toString() == _selectedBranch;
+          final productMatch = _selectedProduct == null || order.brand == _selectedProduct;
+          final batchMatch = _filterBatchId == null || (order.batchId ?? 'single_${order.id}') == _filterBatchId;
+
+          // Search filter
+          final searchMatch = _searchQuery.isEmpty ||
+              order.brand.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              order.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              order.itemId.toString().toLowerCase().contains(_searchQuery.toLowerCase());
+
+          return branchMatch && productMatch && batchMatch && searchMatch;
+        }).toList();
+
+        // Get unique branches and products for filter dropdowns
+        final branchIds = allOrders.map((o) => o.branchId).toSet().toList()..sort();
+        final products = allOrders.map((o) => o.brand).toSet().toList()..sort();
 
         // Group orders by batchId
         final orderBatches = <String, List<Order>>{};
@@ -38,14 +84,33 @@ class _OrderListScreenState extends State<OrderListScreen> {
           );
 
         return Scaffold(
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const OrderScreen(),
+                ),
+              ).then((_) {
+                // Refresh orders after returning from order screen
+                if (mounted) {
+                  context.read<OrderProvider>().loadOrders();
+                }
+              });
+            },
+            backgroundColor: const Color(0xFF0651A4),
+            foregroundColor: Colors.white,
+            elevation: 6,
+            tooltip: 'Go to Order Screen',
+            child: const Icon(Icons.shopping_cart),
+          ),
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: isDarkMode
-                    ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
-                    : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
+                    ? [const Color(0xFF1E1E1E), const Color(0xFF2D2D2D), const Color(0xFF3A3A3A)]
+                    : [const Color(0xFF0651A4), const Color(0xFF0A7BFF), const Color(0xFF42A5F5)],
               ),
             ),
             child: Stack(
@@ -59,7 +124,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -71,7 +136,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                     ),
                   ),
                 ),
@@ -83,7 +148,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 100,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                     ),
                   ),
                 ),
@@ -95,7 +160,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                      color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                     ),
                   ),
                 ),
@@ -131,16 +196,66 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   shadows: [
                                     Shadow(
                                       blurRadius: 10.0,
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(alpha: 0.3),
                                       offset: const Offset(2, 2),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
+                            IconButton(
+                              onPressed: () => _showFilterDialog(context, branchIds, products, allOrders),
+                              icon: Icon(
+                                Icons.filter_list,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
                           ],
                         ),
                       ),
+                      // Search TextField
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16.0),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'Search Orders',
+                            labelStyle: TextStyle(
+                              color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                            ),
+                            hintText: 'Search by brand, location, or item ID',
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: isDarkMode ? Colors.grey[700] : Colors.white,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       Expanded(
                         child: batchList.isEmpty
                             ? Center(
@@ -149,7 +264,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(32),
                                     decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                                      color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                                       borderRadius: BorderRadius.circular(30),
                                     ),
                                     child: Column(
@@ -158,13 +273,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                         Container(
                                           padding: const EdgeInsets.all(20),
                                           decoration: BoxDecoration(
-                                            color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                            color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(20),
                                           ),
                                           child: Icon(
                                             Icons.shopping_cart_outlined,
                                             size: 60,
-                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         const SizedBox(height: 20),
@@ -173,7 +288,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                           style: TextStyle(
                                             fontSize: 20,
                                             fontWeight: FontWeight.bold,
-                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         const SizedBox(height: 8),
@@ -204,6 +319,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     0,
                                     (sum, order) => sum + order.quantity,
                                   );
+                                  
+                                  // Parse date string for display
+                                  DateTime? firstOrderDate;
+                                  try {
+                                    firstOrderDate = DateTime.parse(firstOrder.dateOrdered);
+                                  } catch (e) {
+                                    firstOrderDate = null;
+                                  }
+                                  
                                   return Card(
                                     elevation: 6,
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -213,7 +337,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     color: isDarkMode ? Colors.grey[800] : Colors.white,
                                     shadowColor: const Color(
                                       0xFF0651A4,
-                                    ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                    ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                     child: InkWell(
                                       onTap: () => _showBatchDetails(
                                         context,
@@ -233,7 +357,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                     12,
                                                   ),
                                                   decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           15,
@@ -241,7 +365,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                   ),
                                                   child: Icon(
                                                     Icons.inventory_2,
-                                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                                     size: 24,
                                                   ),
                                                 ),
@@ -258,7 +382,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                           fontSize: 18,
                                                           fontWeight:
                                                               FontWeight.bold,
-                                                          color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                          color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                                         ),
                                                       ),
                                                       Text(
@@ -278,17 +402,19 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                         vertical: 6,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           15,
                                                         ),
                                                   ),
                                                   child: Text(
-                                                    '${firstOrder.dateOrdered.day}/${firstOrder.dateOrdered.month}/${firstOrder.dateOrdered.year}',
+                                                    firstOrderDate != null 
+                                                        ? '${firstOrderDate.day}/${firstOrderDate.month}/${firstOrderDate.year}'
+                                                        : firstOrder.dateOrdered,
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                                      color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
@@ -302,7 +428,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                                 Expanded(
                                                   child: _buildInfoItem(
                                                     'Branch',
-                                                    'Branch ${firstOrder.branchId}',
+                                                    _branches.firstWhere(
+                                                      (b) => b.id == firstOrder.branchId,
+                                                      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
+                                                    ).name,
                                                     isDarkMode: isDarkMode,
                                                   ),
                                                 ),
@@ -316,25 +445,50 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 12),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 6,
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 6,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(15),
+                                                    ),
+                                                    child: Text(
+                                                      'Tap to view order details',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
                                                   ),
-                                              decoration: BoxDecoration(
-                                                color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                              ),
-                                              child: Text(
-                                                'Tap to view order details',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                                  fontStyle: FontStyle.italic,
                                                 ),
-                                              ),
+                                                const SizedBox(width: 8),
+                                                IconButton(
+                                                  onPressed: () => _editOrderBatch(batchOrders),
+                                                  icon: Icon(
+                                                    Icons.edit,
+                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: 'Edit Order',
+                                                ),
+                                                IconButton(
+                                                  onPressed: () => _deleteOrderBatch(batchOrders),
+                                                  icon: Icon(
+                                                    Icons.delete,
+                                                    color: Colors.red,
+                                                    size: 20,
+                                                  ),
+                                                  tooltip: 'Delete Order',
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -381,6 +535,320 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
+  void _showFilterDialog(BuildContext context, List<int> branchIds, List<String> products, List<Order> allOrders) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    // Local variables for dialog state
+    String? localSelectedBranch = _selectedBranch;
+    String? localSelectedProduct = _selectedProduct;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.filter_list, color: Colors.white, size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Filter Orders',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      // Branch Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Branch',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                color: isDarkMode ? Colors.grey[700] : Colors.white,
+                              ),
+                              child: DropdownButton<String>(
+                                value: localSelectedBranch,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text('Select Branch'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Branches'),
+                                  ),
+                                  ...branchIds.map((branchId) {
+                                    final branch = _branches.firstWhere(
+                                      (b) => b.id == branchId,
+                                      orElse: () => Branch(id: branchId, name: 'Branch $branchId', location: ''),
+                                    );
+                                    return DropdownMenuItem<String>(
+                                      value: branchId.toString(),
+                                      child: Text(branch.name),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    localSelectedBranch = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Product Filter
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDarkMode ? Colors.grey[800] : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Filter by Product',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                            ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDarkMode ? Colors.white70 : Colors.grey.shade400,
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                color: isDarkMode ? Colors.grey[700] : Colors.white,
+                              ),
+                              child: DropdownButton<String>(
+                                value: localSelectedProduct,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text('Select Product'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All Products'),
+                                  ),
+                                  ...products.map((product) => DropdownMenuItem<String>(
+                                    value: product,
+                                    child: Text(product),
+                                  )),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    localSelectedProduct = value;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  localSelectedBranch = null;
+                                  localSelectedProduct = null;
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                                foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                              ),
+                              child: const Text('Clear Filters'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // Apply filters and close dialog
+                                this.setState(() {
+                                  _selectedBranch = localSelectedBranch;
+                                  _selectedProduct = localSelectedProduct;
+                                });
+                                Navigator.of(context).pop();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                elevation: 4,
+                                shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
+                              ),
+                              child: const Text(
+                                'Apply',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editOrderBatch(List<Order> batchOrders) {
+    // Navigate to order screen with pre-filled data for editing
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => OrderScreen(editBatch: batchOrders),
+      ),
+    ).then((_) {
+      // Refresh orders after returning from edit screen
+      context.read<OrderProvider>().loadOrders();
+    });
+  }
+
+  void _deleteOrderBatch(List<Order> batchOrders) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          title: Text(
+            'Delete Order Batch',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete this order batch with ${batchOrders.length} items?',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  for (final order in batchOrders) {
+                    await AppDatabase.instance.deleteOrder(order.id);
+                  }
+                  // Refresh the orders list
+                  if (mounted) {
+                    context.read<OrderProvider>().loadOrders();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Order batch deleted successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error deleting order batch: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showBatchDetails(BuildContext context, List<Order> batchOrders) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
@@ -397,7 +865,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -409,7 +877,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                    color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -443,7 +911,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                         color: isDarkMode ? Colors.grey[800] : Colors.white,
-                        shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.2),
+                        shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -454,7 +922,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                   CircleAvatar(
                                     backgroundColor: const Color(
                                       0xFF0651A4,
-                                    ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                    ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                     child: Text(
                                       '${index + 1}',
                                       style: const TextStyle(
@@ -474,7 +942,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
-                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
                                           ),
                                         ),
                                         Text(
@@ -500,14 +968,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(15),
                                     ),
                                     child: Text(
                                       'Qty: ${order.quantity}',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
                                       ),
                                     ),
                                   ),
@@ -526,14 +994,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                      backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
                       elevation: 4,
-                      shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.3),
+                      shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                     ),
                     child: const Text(
                       'Close',

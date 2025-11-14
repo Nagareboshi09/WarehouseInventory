@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
+import 'package:drift/drift.dart' hide Column;
 
 class EditMasterItemScreen extends StatefulWidget {
   final Branch branch;
@@ -16,7 +16,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
   bool _isLoading = true;
   List<MasterItem> _masterItems = [];
   String _searchQuery = '';
- final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -32,7 +32,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
 
   Future<void> _loadMasterItems() async {
     try {
-      final items = await DatabaseHelper.instance.getMasterItemsByBranch(widget.branch.id!);
+      final items = await AppDatabase.instance.getMasterItemsByBranch(widget.branch.id!);
       if (mounted) {
         setState(() {
           _masterItems = items;
@@ -44,7 +44,7 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading master items: \$e')),
+        SnackBar(content: Text('Error loading master items: $e')),
       );
     }
   }
@@ -58,74 +58,212 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
         final locationController = TextEditingController(text: item.location);
         final brandController = TextEditingController(text: item.brand ?? '');
 
-        return AlertDialog(
-          title: const Text('Edit Master Item'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
-                TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Local validation state for the dialog
+            bool isSkuValidating = false;
+            String? skuErrorMessage;
+            Timer? skuValidationTimer;
+
+            Future<void> validateSkuRealtime(String value) async {
+              final sku = value.trim();
+              
+              // Skip validation if SKU is the same as the original or too short
+              if (sku.length < 2 || sku == item.sku) {
+                setDialogState(() {
+                  skuErrorMessage = null;
+                  isSkuValidating = false;
+                });
+                return;
+              }
+
+              setDialogState(() {
+                isSkuValidating = true;
+                skuErrorMessage = null;
+              });
+
+              try {
+                final existingItems = await AppDatabase.instance.getMasterItemsByBranch(widget.branch.id!);
+                final isDuplicate = existingItems.any(
+                  (existingItem) => existingItem.sku.toLowerCase() == sku.toLowerCase() && existingItem.id != item.id,
+                );
+
+                setDialogState(() {
+                  isSkuValidating = false;
+                  skuErrorMessage = isDuplicate
+                      ? 'SKU "$sku" already exists in this branch. Please choose a different SKU.'
+                      : null;
+                });
+              } catch (e) {
+                setDialogState(() {
+                  isSkuValidating = false;
+                  skuErrorMessage = null;
+                });
+              }
+            }
+
+            void onSkuChanged(String value) {
+              // Clear previous error when user starts typing
+              if (skuErrorMessage != null && value.isNotEmpty) {
+                setDialogState(() {
+                  skuErrorMessage = null;
+                });
+              }
+
+              // Debounce the validation
+              skuValidationTimer?.cancel();
+              skuValidationTimer = Timer(const Duration(milliseconds: 800), () {
+                validateSkuRealtime(value);
+              });
+            }
+
+            // Add listener for real-time SKU validation
+            skuController.addListener(() {
+              onSkuChanged(skuController.text);
+            });
+
+            return AlertDialog(
+              title: const Text('Edit Master Item'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: skuController,
+                      decoration: InputDecoration(
+                        labelText: 'SKU *',
+                        prefixIcon: Icon(
+                          Icons.tag,
+                          color: isSkuValidating
+                              ? Colors.orange
+                              : (skuErrorMessage != null ? Colors.red : Colors.blue),
+                        ),
+                        suffixIcon: isSkuValidating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : (skuErrorMessage != null
+                                ? Icon(Icons.error, color: Colors.red)
+                                : null),
+                        errorText: skuErrorMessage,
+                        errorMaxLines: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description *',
+                        prefixIcon: Icon(Icons.description),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: brandController,
+                      decoration: const InputDecoration(
+                        labelText: 'Brand',
+                        prefixIcon: Icon(Icons.branding_watermark),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: locationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Location *',
+                        prefixIcon: Icon(Icons.location_on),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    skuValidationTimer?.cancel();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Item'),
+                        content: const Text('Are you sure you want to delete this item?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      skuValidationTimer?.cancel();
+                      _deleteItem(item.id!);
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                ),
+                ElevatedButton(
+                  onPressed: (isSkuValidating || skuErrorMessage != null ||
+                           skuController.text.trim().isEmpty ||
+                           descController.text.trim().isEmpty ||
+                           locationController.text.trim().isEmpty) ? null : () async {
+                    
+                    try {
+                      final updated = MasterItem(
+                        id: item.id,
+                        sku: skuController.text.trim(),
+                        description: descController.text.trim(),
+                        location: locationController.text.trim(),
+                        brand: brandController.text.trim().isEmpty ? null : brandController.text.trim(),
+                        branchId: item.branchId,
+                      );
+                      
+                      await AppDatabase.instance.updateMasterItem(updated);
+                      if (mounted) {
+                        Navigator.pop(context);
+                        _loadMasterItems();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Master item updated successfully!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error updating item: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Delete Item'),
-                    content: const Text('Are you sure you want to delete this item?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true) {
-                  _deleteItem(item.id!);
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final updated = MasterItem(
-                  id: item.id,
-                  sku: skuController.text.trim(),
-                  description: descController.text.trim(),
-                  location: locationController.text.trim(),
-                  brand: brandController.text.trim(),
-                  branchId: item.branchId,
-                );
-                await DatabaseHelper.instance.updateMasterItem(updated);
-                Navigator.pop(context);
-                _loadMasterItems();
-              },
-              child: const Text('Save'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
 
   void _deleteItem(int id) async {
-    await DatabaseHelper.instance.deleteMasterItem(id);
+    await AppDatabase.instance.deleteMasterItem(id);
     _loadMasterItems();
   }
 
@@ -138,37 +276,177 @@ class _EditMasterItemScreenState extends State<EditMasterItemScreen> {
         final brandController = TextEditingController();
         final locationController = TextEditingController(text: widget.branch.location);
 
-        return AlertDialog(
-          title: const Text('Add New Master Item'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(controller: skuController, decoration: const InputDecoration(labelText: 'SKU')),
-                TextField(controller: descController, decoration: const InputDecoration(labelText: 'Description')),
-                TextField(controller: brandController, decoration: const InputDecoration(labelText: 'Brand')),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                final newItem = MasterItem(
-                  sku: skuController.text.trim(),
-                  description: descController.text.trim(),
-                  location: locationController.text.trim(),
-                  brand: brandController.text.trim(),
-                  branchId: widget.branch.id!,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Local validation state for the dialog
+            bool isSkuValidating = false;
+            String? skuErrorMessage;
+            Timer? skuValidationTimer;
+
+            Future<void> validateSkuRealtime(String value) async {
+              final sku = value.trim();
+              
+              // Skip validation if SKU is too short or empty
+              if (sku.length < 2) {
+                setDialogState(() {
+                  skuErrorMessage = null;
+                  isSkuValidating = false;
+                });
+                return;
+              }
+
+              setDialogState(() {
+                isSkuValidating = true;
+                skuErrorMessage = null;
+              });
+
+              try {
+                final existingItems = await AppDatabase.instance.getMasterItemsByBranch(widget.branch.id!);
+                final isDuplicate = existingItems.any(
+                  (item) => item.sku.toLowerCase() == sku.toLowerCase(),
                 );
-                await DatabaseHelper.instance.createMasterItem(newItem);
-                Navigator.pop(context);
-                _loadMasterItems();
-              },
-              child: const Text('Add'),
-            ),
-          ],
+
+                setDialogState(() {
+                  isSkuValidating = false;
+                  skuErrorMessage = isDuplicate
+                      ? 'SKU "$sku" already exists in this branch. Please choose a different SKU.'
+                      : null;
+                });
+              } catch (e) {
+                setDialogState(() {
+                  isSkuValidating = false;
+                  skuErrorMessage = null;
+                });
+              }
+            }
+
+            void onSkuChanged(String value) {
+              // Clear previous error when user starts typing
+              if (skuErrorMessage != null && value.isNotEmpty) {
+                setDialogState(() {
+                  skuErrorMessage = null;
+                });
+              }
+
+              // Debounce the validation
+              skuValidationTimer?.cancel();
+              skuValidationTimer = Timer(const Duration(milliseconds: 800), () {
+                validateSkuRealtime(value);
+              });
+            }
+
+            // Add listener for real-time SKU validation
+            skuController.addListener(() {
+              onSkuChanged(skuController.text);
+            });
+
+            return AlertDialog(
+              title: const Text('Add New Master Item'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: skuController,
+                      decoration: InputDecoration(
+                        labelText: 'SKU *',
+                        prefixIcon: Icon(
+                          Icons.tag,
+                          color: isSkuValidating
+                              ? Colors.orange
+                              : (skuErrorMessage != null ? Colors.red : Colors.blue),
+                        ),
+                        suffixIcon: isSkuValidating
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : (skuErrorMessage != null
+                                ? Icon(Icons.error, color: Colors.red)
+                                : null),
+                        errorText: skuErrorMessage,
+                        errorMaxLines: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: descController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description *',
+                        prefixIcon: Icon(Icons.description),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: brandController,
+                      decoration: const InputDecoration(
+                        labelText: 'Brand',
+                        prefixIcon: Icon(Icons.branding_watermark),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: locationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Location *',
+                        prefixIcon: Icon(Icons.location_on),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    skuValidationTimer?.cancel();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Cancel')
+                ),
+                ElevatedButton(
+                  onPressed: (isSkuValidating || skuErrorMessage != null ||
+                           skuController.text.trim().isEmpty ||
+                           descController.text.trim().isEmpty ||
+                           locationController.text.trim().isEmpty) ? null : () async {
+                    
+                    try {
+                      final newItem = MasterItemsCompanion.insert(
+                        sku: skuController.text.trim(),
+                        description: descController.text.trim(),
+                        location: locationController.text.trim(),
+                        brand: brandController.text.trim().isEmpty ? const Value.absent() : Value(brandController.text.trim()),
+                        branchId: widget.branch.id!,
+                      );
+                      
+                      await AppDatabase.instance.insertMasterItemFromCompanion(newItem);
+                      if (mounted) {
+                        Navigator.pop(context);
+                        _loadMasterItems();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Master item added successfully!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error adding item: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

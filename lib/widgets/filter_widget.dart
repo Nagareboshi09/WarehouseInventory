@@ -13,39 +13,42 @@ extension FilterExtension on State {
         children: [
           const Text('Filter by:', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(width: 8),
-          DropdownButton<String>(
-            hint: const Text('Select Filter'),
-            items: filterOptions,
-            onChanged: (value) {
-              if (value == null) return;
-              TextEditingController filterController = TextEditingController();
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text('Filter by $value'),
-                  content: TextField(
-                    controller: filterController,
-                    decoration: const InputDecoration(hintText: 'Enter value'),
+          Expanded(
+            child: DropdownButton<String>(
+              hint: const Text('Select Filter'),
+              isExpanded: true,
+              items: filterOptions,
+              onChanged: (value) {
+                if (value == null) return;
+                TextEditingController filterController = TextEditingController();
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text('Filter by $value'),
+                    content: TextField(
+                      controller: filterController,
+                      decoration: const InputDecoration(hintText: 'Enter value'),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          final text = filterController.text.trim();
+                          if (text.isNotEmpty) {
+                            onFilterApplied(value, text);
+                            Navigator.pop(context);
+                          }
+                        },
+                        child: const Text('Apply'),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        final text = filterController.text.trim();
-                        if (text.isNotEmpty) {
-                          onFilterApplied(value, text);
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: const Text('Apply'),
-                    ),
-                  ],
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
           if (onReset != null) ...[
             const SizedBox(width: 8),

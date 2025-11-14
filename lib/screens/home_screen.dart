@@ -101,13 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Warehouse Inventory'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: 'Logout',
-          ),
-        ],
       ),
       drawer: Drawer(
         width: MediaQuery.of(context).size.width * 0.75, // Make drawer wider

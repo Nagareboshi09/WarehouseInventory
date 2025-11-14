@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen>
       });
 
       try {
-        final user = await DatabaseHelper.instance.getUser(
+        final user = await AppDatabase.instance.getUser(
           _usernameController.text,
           _passwordController.text,
         );

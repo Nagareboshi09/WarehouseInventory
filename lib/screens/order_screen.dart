@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/branch.dart';
-import 'package:warehouse_inventory/models/master_item.dart';
-import 'package:warehouse_inventory/models/order.dart';
-import 'package:warehouse_inventory/providers/order_provider.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
+import 'package:drift/drift.dart' as drift;
+// Using Drift-generated classes instead of old model classes
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/screens/order_list_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({super.key});
+   final List<Order>? editBatch;
 
-  @override
-  State<OrderScreen> createState() => _OrderScreenState();
-}
+   const OrderScreen({super.key, this.editBatch});
+
+   @override
+   State<OrderScreen> createState() => _OrderScreenState();
+ }
 
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -24,18 +24,24 @@ class _OrderScreenState extends State<OrderScreen> {
   Branch? _selectedBranch;
   Map<int, TextEditingController> _quantityControllers = {};
   Map<int, int> _orderQuantities = {};
+  Map<String, int> _inventoryStock = {};
+  Map<String, int> _itemSales = {};
   String _searchQuery = '';
   List<MasterItem> _filteredItems = [];
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    if (widget.editBatch != null) {
+      _loadEditData();
+    } else {
+      _loadData();
+    }
   }
 
   Future<void> _loadData() async {
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
       setState(() {
         _branches = branches;
       });
@@ -54,21 +60,82 @@ class _OrderScreenState extends State<OrderScreen> {
     }
   }
 
+  Future<void> _loadEditData() async {
+    if (widget.editBatch == null || widget.editBatch!.isEmpty) return;
+
+    final firstOrder = widget.editBatch!.first;
+
+    // Wait for branches to be loaded if not already loaded
+    if (_branches.isEmpty) {
+      await _loadData();
+    }
+
+    // Find the branch for this order
+    final branch = _branches.firstWhere(
+      (b) => b.id == firstOrder.branchId,
+      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
+    );
+
+    setState(() {
+      _selectedBranch = branch;
+      _locationController.text = firstOrder.location;
+    });
+
+    // Load master items for the branch
+    await _loadMasterItems();
+
+    // Filter to only show items that are in the edit batch
+    final editBatchItemIds = widget.editBatch!.map((order) => order.itemId).toSet();
+    setState(() {
+      _filteredItems = _masterItems.where((item) => editBatchItemIds.contains(item.id)).toList();
+      
+      // Initialize controllers only for items in the edit batch
+      _quantityControllers.clear();
+      _orderQuantities.clear();
+      for (var item in _filteredItems) {
+        _quantityControllers[item.id ?? 0] = TextEditingController();
+        _orderQuantities[item.id ?? 0] = 0;
+      }
+    });
+
+    // Pre-fill quantities from the edit batch
+    for (final order in widget.editBatch!) {
+      if (_orderQuantities.containsKey(order.itemId)) {
+        _quantityControllers[order.itemId]?.text = order.quantity.toString();
+        _orderQuantities[order.itemId] = order.quantity;
+      }
+    }
+  }
+
   Future<void> _loadMasterItems() async {
     if (_selectedBranch == null) return;
     try {
-      final masterItems = await DatabaseHelper.instance.getMasterItemsByBranch(
-        _selectedBranch!.id!,
+      final masterItems = await AppDatabase.instance.getMasterItemsByBranch(
+        _selectedBranch?.id ?? 0,
       );
+      final inventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
+        _selectedBranch?.id ?? 0,
+      );
+
+      // Create a map of SKU to stock quantity and sales
+      final stockMap = <String, int>{};
+      final salesMap = <String, int>{};
+      for (var invItem in inventoryItems) {
+        stockMap[invItem.sku] = invItem.end;
+        salesMap[invItem.sku] = invItem.sales ?? 0;
+      }
+
       setState(() {
         _masterItems = masterItems;
         _filteredItems = masterItems;
+        _inventoryStock = stockMap;
+        _itemSales = salesMap;
         // Initialize controllers for each item
         _quantityControllers.clear();
         _orderQuantities.clear();
         for (var item in masterItems) {
-          _quantityControllers[item.id!] = TextEditingController();
-          _orderQuantities[item.id!] = 0;
+          _quantityControllers[item.id ?? 0] = TextEditingController();
+          _orderQuantities[item.id ?? 0] = 0;
         }
       });
     } catch (e) {
@@ -117,56 +184,243 @@ class _OrderScreenState extends State<OrderScreen> {
       _isLoading = true;
     });
 
-    // Generate a unique batch ID for this order session
-    final batchId = DateTime.now().millisecondsSinceEpoch.toString();
+    // If editing, delete existing orders first
+    if (widget.editBatch != null) {
+      try {
+        for (final order in widget.editBatch!) {
+          await AppDatabase.instance.deleteOrder(order.id);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating orders: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+    }
+
+    // Generate a unique batch ID for this order session (or use existing if editing)
+    final batchId = widget.editBatch != null
+        ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
+        : DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Preserve the location value before form reset
+    final savedLocation = _locationController.text.trim();
 
     // Create orders for each item with quantity > 0
-    List<Order> orders = [];
-    for (var item in _masterItems) {
-      int quantity = _orderQuantities[item.id!] ?? 0;
+    List<OrdersCompanion> orderCompanions = [];
+    // Use filtered items if editing, otherwise use all master items
+    final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
+    for (var item in itemsToProcess) {
+      int quantity = _orderQuantities[item.id ?? 0] ?? 0;
       if (quantity > 0) {
-        final order = Order(
-          branchId: _selectedBranch!.id!,
+        final orderCompanion = OrdersCompanion.insert(
+          branchId: _selectedBranch?.id ?? 0,
           location: _locationController.text.trim(),
           brand: item.brand ?? '',
-          itemId: item.id!,
+          itemId: item.id ?? 0,
           quantity: quantity,
-          dateOrdered: DateTime.now(),
-          batchId: batchId,
+          dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
+          status: const drift.Value('pending'),
+          batchId: drift.Value(batchId),
         );
-        orders.add(order);
+        orderCompanions.add(orderCompanion);
       }
     }
 
     // Add orders to provider
-    for (var order in orders) {
-      context.read<OrderProvider>().addOrder(order);
+    try {
+      for (var orderCompanion in orderCompanions) {
+        await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving orders: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
+      return;
     }
 
     // Simulate order submission
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${orders.length} order(s) submitted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 28,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Success!',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              // Stay on current screen button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // If editing, go back to order list
+                  if (widget.editBatch != null) {
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  
+                  // Reset form for new orders
+                  _formKey.currentState!.reset();
+                  // Don't clear location - keep it for continuity
+                  // Clear quantities
+                  for (var controller in _quantityControllers.values) {
+                    controller.clear();
+                  }
+                  setState(() {
+                    _orderQuantities.clear();
+                    if (widget.editBatch != null) {
+                      // For editing mode, reset only the filtered items
+                      for (var item in _filteredItems) {
+                        _orderQuantities[item.id ?? 0] = 0;
+                      }
+                    } else {
+                      // For new orders, reset all master items
+                      for (var item in _masterItems) {
+                        _orderQuantities[item.id ?? 0] = 0;
+                      }
+                    }
+                    _searchQuery = '';
+                    _filteredItems = _masterItems;
+                    _inventoryStock.clear();
+                    _itemSales.clear();
+                    // Restore the location field with the saved value
+                    _locationController.text = savedLocation;
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                  foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  'Continue',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              // Go to orders list button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // If editing, go back to order list
+                  if (widget.editBatch != null) {
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  
+                  // Navigate to order list screen with the submitted batch ID
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => OrderListScreen(initialBatchId: batchId),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  'View Orders',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
-      // Reset form
+
+      // If editing, go back to order list
+      if (widget.editBatch != null) {
+        Navigator.of(context).pop();
+        return;
+      }
+
+      // Reset form for new orders
       _formKey.currentState!.reset();
-      _locationController.clear();
+      // Don't clear location - keep it for continuity
       // Clear quantities
       for (var controller in _quantityControllers.values) {
         controller.clear();
       }
       setState(() {
         _orderQuantities.clear();
-        for (var item in _masterItems) {
-          _orderQuantities[item.id!] = 0;
+        if (widget.editBatch != null) {
+          // For editing mode, reset only the filtered items
+          for (var item in _filteredItems) {
+            _orderQuantities[item.id ?? 0] = 0;
+          }
+        } else {
+          // For new orders, reset all master items
+          for (var item in _masterItems) {
+            _orderQuantities[item.id ?? 0] = 0;
+          }
         }
         _searchQuery = '';
         _filteredItems = _masterItems;
+        _inventoryStock.clear();
+        _itemSales.clear();
+        // Restore the location field with the saved value
+        _locationController.text = savedLocation;
       });
     }
 
@@ -212,7 +466,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -224,7 +478,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -236,7 +490,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -248,7 +502,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -263,8 +517,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    const HomeScreen(initialIndex: 0),
+                                builder: (_) => const HomeScreen(initialIndex: 0),
                               ),
                             );
                           },
@@ -276,7 +529,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            'Create Order',
+                            widget.editBatch != null ? 'Edit Order' : 'Create Order',
                             style: TextStyle(
                               fontSize: 28.0,
                               fontWeight: FontWeight.bold,
@@ -284,7 +537,7 @@ class _OrderScreenState extends State<OrderScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -304,11 +557,11 @@ class _OrderScreenState extends State<OrderScreen> {
                           children: [
                             Container(
                               decoration: BoxDecoration(
-                                color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                                color: isDarkMode ? (Colors.grey[850] ?? Colors.grey).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                                 borderRadius: BorderRadius.circular(30),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                                    color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                     blurRadius: 10,
                                     offset: const Offset(0, 5),
                                   ),
@@ -353,11 +606,11 @@ class _OrderScreenState extends State<OrderScreen> {
                                         color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: DropdownButtonFormField<Branch>(
-                                        value: _selectedBranch,
+                                        initialValue: _selectedBranch,
                                         decoration: InputDecoration(
                                           labelText: 'Branch *',
                                           labelStyle: TextStyle(
@@ -409,7 +662,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: TextFormField(
@@ -444,49 +697,52 @@ class _OrderScreenState extends State<OrderScreen> {
                                     if (_selectedBranch != null &&
                                         _masterItems.isNotEmpty) ...[
                                       Text(
-                                        'Select Items to Order',
+                                        widget.editBatch != null
+                                            ? 'Ordered Items (${_filteredItems.length})'
+                                            : 'Select Items to Order',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                                      if (widget.editBatch == null) ...[
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: TextField(
+                                            decoration: InputDecoration(
+                                              labelText: 'Search Items',
+                                              labelStyle: TextStyle(
+                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                              ),
+                                              hintText:
+                                                  'Search by SKU, name, or brand',
+                                              prefixIcon: Icon(
+                                                Icons.search,
+                                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                              ),
+                                              border: InputBorder.none,
+                                              contentPadding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 12,
+                                                  ),
+                                            ),
+                                            onChanged: _filterItems,
                                           ),
                                         ),
-                                        child: TextField(
-                                          decoration: InputDecoration(
-                                            labelText: 'Search Items',
-                                            labelStyle: TextStyle(
-                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                            ),
-                                            hintText:
-                                                'Search by SKU, name, or brand',
-                                            prefixIcon: Icon(
-                                              Icons.search,
-                                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                            ),
-                                            border: InputBorder.none,
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 16,
-                                                  vertical: 12,
-                                                ),
-                                          ),
-                                          onChanged: _filterItems,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
+                                        const SizedBox(height: 12),
+                                      ],
                                       Container(
                                         height: 300,
                                         decoration: BoxDecoration(
                                           border: Border.all(
-                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                                           ),
                                           borderRadius: BorderRadius.circular(
                                             20,
@@ -510,96 +766,121 @@ class _OrderScreenState extends State<OrderScreen> {
                                               color: isDarkMode ? Colors.grey[800] : Colors.white,
                                               shadowColor: const Color(
                                                 0xFF0651A4,
-                                              ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                              ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                               child: Padding(
                                                 padding: const EdgeInsets.all(
                                                   12,
                                                 ),
-                                                child: Row(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    CircleAvatar(
-                                                      backgroundColor:
-                                                          const Color(
-                                                            0xFF0651A4,
-                                                          ).withOpacity(isDarkMode ? 0.3 : 0.1),
-                                                      child: const Icon(
-                                                        Icons.inventory,
-                                                        color: Color(
-                                                          0xFF0651A4,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: Column(
-                                                        crossAxisAlignment:
-                                                            CrossAxisAlignment
-                                                                .start,
-                                                        children: [
-                                                          Text(
-                                                            item.description,
-                                                            style:
-                                                                TextStyle(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                    Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Row(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            CircleAvatar(
+                                                              backgroundColor:
+                                                                  const Color(
+                                                                    0xFF0651A4,
+                                                                  ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                                                              child: const Icon(
+                                                                Icons.inventory,
+                                                                color: Color(
+                                                                  0xFF0651A4,
                                                                 ),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 12),
+                                                            Expanded(
+                                                              child: Column(
+                                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                                children: [
+                                                                  Text(
+                                                                    item.description,
+                                                                    style: TextStyle(
+                                                                      fontWeight: FontWeight.bold,
+                                                                      fontSize: 14,
+                                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                                    ),
+                                                                    maxLines: 2,
+                                                                    overflow: TextOverflow.ellipsis,
+                                                                  ),
+                                                                  const SizedBox(height: 4),
+                                                                  Container(
+                                                                    width: double.infinity,
+                                                                    child: Wrap(
+                                                                      spacing: 12,
+                                                                      runSpacing: 4,
+                                                                      children: [
+                                                                        _buildInfoChip(
+                                                                          'SKU: ${item.sku}',
+                                                                          isDarkMode,
+                                                                          Icons.tag,
+                                                                        ),
+                                                                        _buildInfoChip(
+                                                                          'Brand: ${item.brand ?? 'N/A'}',
+                                                                          isDarkMode,
+                                                                          Icons.label,
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(height: 8),
+                                                        Container(
+                                                          width: double.infinity,
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                          decoration: BoxDecoration(
+                                                            color: isDarkMode ? Colors.grey[700] : Colors.grey.shade100,
+                                                            borderRadius: BorderRadius.circular(6),
                                                           ),
-                                                          Text(
-                                                            'SKU: ${item.sku} | Brand: ${item.brand ?? 'N/A'}',
+                                                          child: Text(
+                                                            'Current Stock: ${_inventoryStock[item.sku] ?? 0}',
                                                             style: TextStyle(
                                                               color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                                              fontSize: 12,
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.w500,
                                                             ),
+                                                            textAlign: TextAlign.center,
                                                           ),
-                                                        ],
-                                                      ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                    Container(
-                                                      width: 80,
-                                                      decoration: BoxDecoration(
-                                                        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              15,
-                                                            ),
-                                                        border: Border.all(
-                                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                                                    const SizedBox(height: 12),
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: _buildQuantitySection(
+                                                            'Needed',
+                                                            _quantityControllers[item.id ?? 0],
+                                                            (value) {
+                                                              setState(() {
+                                                                _orderQuantities[item.id ?? 0] = int.tryParse(value) ?? 0;
+                                                              });
+                                                            },
+                                                            isDarkMode,
+                                                            Icons.add_shopping_cart,
+                                                          ),
                                                         ),
-                                                      ),
-                                                      child: TextField(
-                                                        controller:
-                                                            _quantityControllers[item
-                                                                .id!],
-                                                        decoration: InputDecoration(
-                                                          labelText: 'Qty',
-                                                          border:
-                                                              InputBorder.none,
-                                                          contentPadding:
-                                                              const EdgeInsets.symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 8,
-                                                              ),
+                                                        const SizedBox(width: 8),
+                                                        Expanded(
+                                                          child: _buildQuantitySection(
+                                                            'Replenishment',
+                                                            null,
+                                                            null,
+                                                            isDarkMode,
+                                                            Icons.refresh,
+                                                            value: '${((_itemSales[item.sku] ?? 0) * (double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0) - (_inventoryStock[item.sku] ?? 0))}',
+                                                            readOnly: true,
+                                                          ),
                                                         ),
-                                                        keyboardType:
-                                                            TextInputType
-                                                                .number,
-                                                        inputFormatters: [
-                                                          FilteringTextInputFormatter
-                                                              .digitsOnly,
-                                                        ],
-                                                        onChanged: (value) {
-                                                          setState(() {
-                                                            _orderQuantities[item
-                                                                    .id!] =
-                                                                int.tryParse(
-                                                                  value,
-                                                                ) ??
-                                                                0;
-                                                          });
-                                                        },
-                                                      ),
+                                                      ],
                                                     ),
                                                   ],
                                                 ),
@@ -613,7 +894,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(24),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.1),
+                                          color: Colors.red.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             20,
                                           ),
@@ -658,7 +939,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                 elevation: 6,
                                 shadowColor: const Color(
                                   0xFF0651A4,
-                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                                ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                               ),
                               icon: _isLoading
                                   ? const SizedBox(
@@ -671,7 +952,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                _isLoading ? 'Submitting...' : 'Submit Order',
+                                _isLoading ? 'Submitting...' : (widget.editBatch != null ? 'Update Order' : 'Submit Order'),
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -688,6 +969,132 @@ class _OrderScreenState extends State<OrderScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoChip(String text, bool isDarkMode, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuantitySection(
+    String title,
+    TextEditingController? controller,
+    Function(String)? onChanged,
+    bool isDarkMode,
+    IconData icon, {
+    String? value,
+    bool readOnly = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (readOnly && value != null) ...[
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ] else if (controller != null) ...[
+            SizedBox(
+              height: 28,
+              child: TextField(
+                controller: controller,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                ),
+                decoration: InputDecoration(
+                  hintText: '0',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(4),
+                    borderSide: BorderSide(
+                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                onChanged: onChanged,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

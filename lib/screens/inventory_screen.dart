@@ -1,47 +1,78 @@
 import 'package:flutter/material.dart';
-import 'package:warehouse_inventory/database/database_helper.dart';
-import 'package:warehouse_inventory/models/inventory_item.dart';
-import 'package:warehouse_inventory/models/branch.dart';
+import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
-import 'add_inventory_item_screen.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:share_plus/share_plus.dart';
+import 'package:open_file/open_file.dart';
+import 'package:logging/logging.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, this.initialBranch});
+  const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
 
   final Branch? initialBranch;
+  final bool showLowStockOnly;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
+  final Logger _logger = Logger('InventoryScreen');
   List<InventoryItem> _inventoryItems = [];
   List<InventoryItem> _filteredItems = [];
   List<Branch> _branches = [];
   Branch? _selectedBranch;
   bool _isLoading = true;
   bool _branchSelected = false;
+  bool _isExporting = false; // Prevent multiple concurrent exports
   String _searchQuery = '';
   String _branchSearchQuery = '';
-  StreamSubscription<String>? _updateSubscription;
 
   @override
   void initState() {
     super.initState();
+    _initializeLogger();
     _loadBranches();
-    _updateSubscription = DatabaseHelper.instance.updateStream.listen((event) {
-      if (event == 'master_item_updated' && _selectedBranch != null) {
-        _loadInventoryItems();
-      } else if (event == 'branch_updated') {
-        _loadBranches();
+  }
+
+  void _initializeLogger() {
+    // Configure logging level based on environment
+    Logger.root.level = Level.INFO; // Set to Level.ALL for debug, Level.INFO for production
+    
+    // Set up logging listener for console output
+    Logger.root.onRecord.listen((LogRecord record) {
+      final timestamp = record.time.toIso8601String().split('T')[1].split('.')[0];
+      final level = record.level.name.padRight(7);
+      final loggerName = record.loggerName.padRight(15);
+      final message = record.message;
+      
+      // Use different emojis for different log levels
+      final emoji = switch (record.level.name) {
+        'FINE' || 'FINER' || 'FINEST' => '🔍',
+        'INFO' => 'ℹ️',
+        'WARNING' => '⚠️',
+        'SEVERE' => '❌',
+        _ => '📝',
+      };
+      
+      print('$emoji $timestamp [$level] $loggerName: $message');
+      
+      // Log stack trace for errors
+      if (record.level >= Level.SEVERE && record.stackTrace != null) {
+        print('Stack trace: ${record.stackTrace}');
       }
     });
   }
 
-  Future<void> _loadBranches() async {
+Future<void> _loadBranches() async {
     try {
-      final branches = await DatabaseHelper.instance.getAllBranches();
+      final branches = await AppDatabase.instance.getAllBranches();
       if (mounted) {
         setState(() {
           _branches = branches;
@@ -90,7 +121,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  Future<void> _loadInventoryItems() async {
+Future<void> _loadInventoryItems() async {
     if (_selectedBranch == null) return;
 
     setState(() {
@@ -98,13 +129,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
 
     try {
-      final items = await DatabaseHelper.instance.getInventoryItemsByBranch(
-        _selectedBranch!.id!,
+      final items = await AppDatabase.instance.getInventoryItemsByBranch(
+        _selectedBranch!.id,
       );
       if (mounted) {
+        List<InventoryItem> filteredItems = items;
+        if (widget.showLowStockOnly) {
+          final maintainingInventory = int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10;
+          final lowStockThreshold = maintainingInventory - 1;
+          filteredItems = items.where((item) => item.end <= lowStockThreshold).toList();
+        }
         setState(() {
           _inventoryItems = items;
-          _filteredItems = items;
+          _filteredItems = filteredItems;
           _isLoading = false;
           _branchSelected = true;
         });
@@ -149,11 +186,1039 @@ class _InventoryScreenState extends State<InventoryScreen> {
     });
   }
 
+// Test method to debug the export process
+  void _testInventoryData() {
+    if (_selectedBranch == null) {
+      _logger.fine('❌ No branch selected');
+      return;
+    }
+     
+    if (_inventoryItems.isEmpty) {
+      _logger.warning('❌ No inventory items found for branch: ${_selectedBranch!.name}');
+      _logger.fine('Branch ID: ${_selectedBranch!.id}');
+      return;
+    }
+     
+    _logger.info('✅ Data verification:');
+    _logger.fine('Branch: ${_selectedBranch!.name}');
+    _logger.fine('Total items: ${_inventoryItems.length}');
+    _logger.fine('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
+    _logger.fine('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
+  }
+
+  Future<void> _exportInventoryToFile() async {
+    // Prevent multiple concurrent exports
+    if (_isExporting) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⏳ Export already in progress. Please wait...'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (_selectedBranch == null || _inventoryItems.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No inventory data to export'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Test the data before export
+    _testInventoryData();
+
+    // Set exporting flag to prevent concurrent operations
+    setState(() {
+      _isExporting = true;
+    });
+
+    // Show initial loading message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🚀 Creating Excel file...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
+    try {
+      // Create file name with format: branchCode_branchName_date
+      final String currentDate = DateTime.now().toIso8601String().split('T')[0];
+      final String branchName = _selectedBranch!.name.replaceAll(' ', '_');
+      final String branchCode = _selectedBranch!.code ?? _selectedBranch!.id.toString(); // Use branch code from master data, fallback to ID
+      final String fileName = '${branchCode}_${branchName}_${currentDate}.xlsx';
+      
+      // Run the export operation
+      final exportResult = await _performExportInBackground(_inventoryItems, fileName);
+      
+      if (exportResult['success'] == true) {
+        final String filePath = exportResult['path'];
+        final File file = File(filePath);
+        
+        // Debug: Show the file path for troubleshooting
+        _logger.info('✅ Export successful!');
+        _logger.fine('File saved at: $filePath');
+        _logger.fine('File exists: ${await file.exists()}');
+        _logger.fine('File size: ${await file.length()} bytes');
+        
+        if (mounted) {
+          // Show options to user
+          _showExportOptions(file, fileName);
+        }
+      } else {
+        throw Exception(exportResult['error'] ?? 'Unknown export error');
+      }
+      
+    } catch (e, stackTrace) {
+      _logger.severe('Export error: $e', e, stackTrace);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error exporting inventory: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+            action: SnackBarAction(
+              label: 'Try Again',
+              textColor: Colors.white,
+              onPressed: () => _exportInventoryToFile(),
+            ),
+          ),
+        );
+      }
+    } finally {
+      // Always reset the exporting flag
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  // Show export options dialog
+  void _showExportOptions(File file, String fileName) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          title: Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Export Complete!',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Excel file created successfully!',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'File: $fileName',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Items exported: ${_inventoryItems.length}',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'What would you like to do?',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Close',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.grey,
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await Share.shareXFiles(
+                    [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+                    subject: 'Inventory Export - ${_selectedBranch!.name}',
+                    text: 'Here is the inventory export for ${_selectedBranch!.name}',
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error sharing file: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0651A4),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.share, size: 20),
+              label: const Text('Share'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  await OpenFile.open(file.path);
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error opening file: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.open_in_new, size: 20),
+              label: const Text('Open'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Perform the actual export operation in background to prevent UI blocking
+  Future<Map<String, dynamic>> _performExportInBackground(
+    List<InventoryItem> items,
+    String fileName,
+  ) async {
+    try {
+      // Create Excel workbook
+      final excel = Excel.createExcel();
+      
+      // Get the first (default) sheet that Excel creates automatically
+      // DO NOT access by string name to avoid creating additional sheets
+      final sheet = excel.sheets.values.first;
+      
+      // Sort items by brand name A-Z for better organization
+      items.sort((a, b) {
+        final brandA = (a.brand ?? 'N/A').toLowerCase();
+        final brandB = (b.brand ?? 'N/A').toLowerCase();
+        return brandA.compareTo(brandB);
+      });
+      
+      // Add headers
+      sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
+      
+      // Add data rows - simplified to avoid batch processing issues
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final brand = item.brand ?? 'N/A';
+        final description = item.description;
+        final beg = item.beg?.toString() ?? 'N/A';
+        final prev = item.prev?.toString() ?? 'N/A';
+        final sales = item.sales?.toString() ?? 'N/A';
+        
+        sheet.appendRow([
+          item.sku,
+          description,
+          brand,
+          item.location.toString(),
+          item.end.toString(),
+          beg,
+          prev,
+          sales
+        ]);
+        
+        // Add small delay every 100 items to prevent UI blocking
+        if (i % 100 == 0) {
+          await Future.delayed(const Duration(milliseconds: 1));
+        }
+      }
+
+      // Encode Excel data once
+      final bytes = excel.encode();
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Failed to encode Excel file');
+      }
+
+      // Try multiple storage locations with proper error handling
+      String savePath = '';
+      String locationName = '';
+      bool savedSuccessfully = false;
+      
+      if (Platform.isAndroid) {
+        try {
+          int sdkInt = 28; // Default to Android 9 for safety
+          
+          // Try to get Android version, but don't fail if it doesn't work
+          try {
+            final androidInfo = await DeviceInfoPlugin().androidInfo;
+            sdkInt = androidInfo.version.sdkInt;
+          } catch (e) {
+            _logger.warning('Could not get Android version, using default (Android 9): $e');
+          }
+          
+          // Method 1: For Android 10+ with permissions (scoped storage)
+          if (sdkInt >= 29) {
+            if (await Permission.manageExternalStorage.isGranted) {
+              try {
+                final downloadsDir = await getDownloadsDirectory();
+                if (downloadsDir != null) {
+                  final warehouseDir = Directory('${downloadsDir.path}/WarehouseInventory');
+                  
+                  if (!await warehouseDir.exists()) {
+                    await warehouseDir.create(recursive: true);
+                  }
+                  
+                  final file = File('${warehouseDir.path}/$fileName');
+                  await file.writeAsBytes(bytes);
+                  savePath = file.absolute.path;
+                  locationName = 'Downloads/WarehouseInventory folder (PUBLIC)';
+                  savedSuccessfully = true;
+                  _logger.fine('✅ Saved to public Downloads for Android 10+');
+                }
+              } catch (e) {
+                _logger.warning('Public Downloads failed for Android 10+: $e');
+              }
+            }
+          }
+          
+          // Method 2: Use app-scoped storage (works for all Android versions)
+          if (!savedSuccessfully) {
+            try {
+              final appDir = await getApplicationDocumentsDirectory();
+              final exportsDir = Directory('${appDir.path}/Exports');
+              
+              if (!await exportsDir.exists()) {
+                await exportsDir.create(recursive: true);
+              }
+              
+              final file = File('${exportsDir.path}/$fileName');
+              await file.writeAsBytes(bytes);
+              savePath = file.absolute.path;
+              
+              // Provide clear location name based on Android version
+              if (sdkInt <= 28) {
+                locationName = 'Exports folder (Android 9- compatible)';
+                _logger.fine('✅ Saved to app-scoped Exports for Android 9- compatibility');
+              } else {
+                locationName = 'Exports folder (app-scoped)';
+                _logger.fine('✅ Saved to app-scoped Exports (no permissions needed)');
+              }
+              savedSuccessfully = true;
+            } catch (e) {
+              _logger.warning('App-scoped storage failed: $e');
+            }
+          }
+        } catch (e) {
+          _logger.warning('Android-specific storage logic failed: $e');
+          
+          // Fallback: Always try app-scoped storage
+          try {
+            final appDir = await getApplicationDocumentsDirectory();
+            final exportsDir = Directory('${appDir.path}/Exports');
+            
+            if (!await exportsDir.exists()) {
+              await exportsDir.create(recursive: true);
+            }
+            
+            final file = File('${exportsDir.path}/$fileName');
+            await file.writeAsBytes(bytes);
+            savePath = file.absolute.path;
+            locationName = 'Exports folder (universal fallback)';
+            savedSuccessfully = true;
+            _logger.fine('✅ Saved to app-scoped Exports (universal fallback)');
+          } catch (fallbackE) {
+            _logger.warning('Universal fallback failed: $fallbackE');
+          }
+        }
+      } else {
+        // For iOS and other platforms, use Documents directory
+        try {
+          final documentsDir = await getApplicationDocumentsDirectory();
+          final exportsDir = Directory('${documentsDir.path}/Exports');
+          
+          if (!await exportsDir.exists()) {
+            await exportsDir.create(recursive: true);
+          }
+          
+          final file = File('${exportsDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'Documents/Exports folder';
+          savedSuccessfully = true;
+          _logger.fine('✅ Saved to Documents/Exports for iOS');
+        } catch (e) {
+          _logger.warning('Documents directory failed: $e');
+        }
+      }
+      
+      // Method 3: Try app-specific directory (if other methods failed)
+      if (!savedSuccessfully) {
+        try {
+          final appDir = await getApplicationDocumentsDirectory();
+          final file = File('${appDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'App Documents folder (fallback)';
+          savedSuccessfully = true;
+          _logger.fine('✅ Saved to App Documents (fallback)');
+        } catch (e) {
+          _logger.warning('App storage failed: $e');
+        }
+      }
+      
+      // Method 4: Try temp directory (last resort)
+      if (!savedSuccessfully) {
+        try {
+          final tempDir = await getTemporaryDirectory();
+          final file = File('${tempDir.path}/$fileName');
+          await file.writeAsBytes(bytes);
+          savePath = file.absolute.path;
+          locationName = 'Temp folder (emergency fallback)';
+          savedSuccessfully = true;
+          _logger.fine('✅ Saved to Temp folder (emergency)');
+        } catch (e) {
+          _logger.warning('Temp directory failed: $e');
+        }
+      }
+      
+      if (savedSuccessfully) {
+        return {
+          'success': true,
+          'path': savePath,
+          'location': locationName,
+        };
+      } else {
+        return {
+          'success': false,
+          'error': 'Unable to save file. Please check permissions and storage space.',
+        };
+      }
+      
+    } catch (e) {
+      return {
+        'success': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
+
+
   Future<void> _showQuantityUpdateDialog(InventoryItem item) async {
-    final TextEditingController quantityController = TextEditingController(
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Calculate values for display
+    final inventoryOfftake = (item.beg ?? 0) + (item.prev ?? 0) - item.end;
+    final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
+    final weeklyOfftake = (item.sales ?? 0) / weeklyOrderOfftake;
+    final weeklyReorderPoint = double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0;
+    final reorderPoint = weeklyOfftake * weeklyReorderPoint;
+    final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
+    final maintinvty = (item.sales ?? 0) * maintainingInventory;
+
+    // Helper function to format doubles to 2 decimal places if not whole
+    String formatDouble(double value) {
+      return value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(2);
+    }
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+          child: SingleChildScrollView(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info, color: Colors.white, size: 28),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Current Values',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.qr_code,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'SKU: ${item.sku}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.description,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Description: ${item.description}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.branding_watermark,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Brand: ${item.brand}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.update,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Last Updated:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                item.lastUpdated != null
+                                  ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!))
+                                  : 'Never',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Location: ${item.location}',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.business,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Branch:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.name ?? 'Unknown'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.shopping_cart,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Weekly Order Offtake:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.warning,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Weekly Reorder Point:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const SizedBox(height: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.inventory,
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Maintaining Inventory:',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 28),
+                              child: Text(
+                                '${_selectedBranch?.maintainingInventory ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Current Values:',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Beg: ${item.beg ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Prev: ${item.prev ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Ending: ${item.end}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Sales: ${item.sales ?? 'N/A'}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Total: ${(item.beg ?? 0) + (item.prev ?? 0)}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Offtake Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Offtake',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Inventory Offtake: ${(item.beg ?? 0) + (item.prev ?? 0) - item.end}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Weekly Offtake: ${formatDouble(weeklyOfftake)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // Inventory Control Objective Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inventory Control Objective',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Reorder Point: ${formatDouble(reorderPoint)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Maintinvty: ${formatDouble(maintinvty)}',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            _showUpdateFormDialog(item);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            elevation: 4,
+                            shadowColor: const Color(
+                              0xFF0651A4,
+                            ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
+                          ),
+                          child: const Text(
+                            'Update',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showUpdateFormDialog(InventoryItem item) async {
+    final TextEditingController begController = TextEditingController();
+    final TextEditingController prevController = TextEditingController();
+    final TextEditingController endingController = TextEditingController(
       text: item.end.toString(),
     );
+    final TextEditingController salesController = TextEditingController();
     bool isLoading = false;
+    int total = 0;
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     await showDialog(
@@ -172,7 +1237,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -206,113 +1271,122 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     ),
                     const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.qr_code,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'SKU: ${item.sku}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.description,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Description: ${item.description}',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.branding_watermark,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Brand: ${item.brand}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.location_on,
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Location: ${item.location}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
                       decoration: BoxDecoration(
                         color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3),
+                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
                         ),
                       ),
-                      child: TextField(
-                        controller: quantityController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'New Quantity',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-                          hintText: 'Enter quantity',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.numbers,
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                          ),
-                        ),
+                      child: StatefulBuilder(
+                        builder: (context, setTableState) {
+                          return Column(
+                            children: [
+                              Table(
+                                columnWidths: const {
+                                  0: FlexColumnWidth(1),
+                                  1: FlexColumnWidth(1),
+                                },
+                                children: [
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: begController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Beg.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: prevController,
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (value) {
+                                            int beg = int.tryParse(begController.text) ?? 0;
+                                            int prev = int.tryParse(prevController.text) ?? 0;
+                                            setTableState(() {
+                                              total = beg + prev;
+                                            });
+                                          },
+                                          decoration: InputDecoration(
+                                            labelText: 'Prev.',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  TableRow(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: endingController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Ending',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: TextField(
+                                          controller: salesController,
+                                          keyboardType: TextInputType.number,
+                                          decoration: InputDecoration(
+                                            labelText: 'Sales',
+                                            labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Total: $total',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -346,89 +1420,148 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                       isLoading = true;
                                     });
 
-                                    final newQuantity = int.tryParse(
-                                      quantityController.text.trim(),
-                                    );
-                                    if (newQuantity != null &&
-                                        newQuantity >= 0) {
-                                      try {
-                                        final updatedItem = InventoryItem(
-                                          id: item.id,
-                                          sku: item.sku,
-                                          description: item.description,
-                                          end: newQuantity,
-                                          location: item.location,
-                                          brand: item.brand,
-                                          dateAdded: item.dateAdded,
-                                          branchId: item.branchId,
+                                    // Validate that all fields are not empty
+                                    if (begController.text.trim().isEmpty ||
+                                        prevController.text.trim().isEmpty ||
+                                        endingController.text.trim().isEmpty ||
+                                        salesController.text.trim().isEmpty) {
+                                      if (mounted) {
+                                        showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return AlertDialog(
+                                              title: Text('Error'),
+                                              content: Text('All fields (Beginning, Previous, Ending, Sales) must be filled. Please enter 0 if no value.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(context).pop(),
+                                                  child: Text('OK'),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         );
+                                      }
+                                    } else {
+                                      final newBeg = int.tryParse(begController.text) ?? 0;
+                                      final newPrev = int.tryParse(prevController.text) ?? 0;
+                                      final newEnding = int.tryParse(endingController.text.trim());
+                                      final newSales = int.tryParse(salesController.text) ?? 0;
 
-                                        await DatabaseHelper.instance
-                                            .updateInventoryItem(updatedItem);
+                                      if (newEnding != null && newEnding >= 0) {
+                                      // Calculate the values that should not be negative
+                                      final inventoryOfftake = newBeg + newPrev - newEnding;
+                                      final weeklyOrderOfftake = double.tryParse(_selectedBranch?.weeklyOrderOfftake?.toString() ?? '1') ?? 1;
+                                      final weeklyOfftake = newSales / weeklyOrderOfftake;
+                                      final weeklyReorderPoint = double.tryParse(_selectedBranch?.weeklyReorderPoint?.toString() ?? '0') ?? 0;
+                                      final reorderPoint = weeklyOfftake * weeklyReorderPoint;
+                                      final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
+                                      final maintinvty = newSales * maintainingInventory;
 
+                                      // Check if any calculated values would be negative
+                                      if (inventoryOfftake < 0 || weeklyOfftake < 0 || reorderPoint < 0 || maintinvty < 0) {
+                                        if (mounted) {
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title: Text('Error'),
+                                                content: Text('Update would result in negative inventory values. Please adjust the inputs.'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    child: Text('OK'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        }
+                                      } else {
+                                        try {
+                                          final updatedItem = InventoryItem(
+                                            id: item.id,
+                                            sku: item.sku,
+                                            description: item.description,
+                                            end: newEnding,
+                                            location: item.location,
+                                            brand: item.brand,
+                                            dateAdded: item.dateAdded,
+                                            lastUpdated: DateTime.now().toIso8601String(),
+                                            branchId: item.branchId,
+                                            beg: newBeg == 0 ? null : newBeg,
+                                            prev: newPrev == 0 ? null : newPrev,
+                                            sales: newSales == 0 ? null : newSales,
+                                          );
+
+await AppDatabase.instance
+                                              .updateInventoryItem(updatedItem);
+
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: const Text(
+                                                  'Quantity updated successfully!',
+                                                ),
+                                                backgroundColor: Colors.green,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                            Navigator.of(context).pop();
+                                            _loadInventoryItems(); // Refresh the list
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error updating quantity: ${e.toString()}',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(15),
+                                                ),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                      } else {
                                         if (mounted) {
                                           ScaffoldMessenger.of(
                                             context,
                                           ).showSnackBar(
                                             SnackBar(
                                               content: const Text(
-                                                'Quantity updated successfully!',
-                                              ),
-                                              backgroundColor: Colors.green,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(15),
-                                              ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                            ),
-                                          );
-                                          Navigator.of(context).pop();
-                                          _loadInventoryItems(); // Refresh the list
-                                        }
-                                      } catch (e) {
-                                        if (mounted) {
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Error updating quantity: ${e.toString()}',
+                                                'Please enter a valid ending quantity',
                                               ),
                                               backgroundColor: Colors.red,
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
-                                                    BorderRadius.circular(15),
+                                                  BorderRadius.circular(15),
                                               ),
-                                              behavior:
-                                                  SnackBarBehavior.floating,
+                                              behavior: SnackBarBehavior.floating,
                                             ),
                                           );
                                         }
                                       }
-                                    } else {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: const Text(
-                                              'Please enter a valid quantity',
-                                            ),
-                                            backgroundColor: Colors.red,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(15),
-                                            ),
-                                            behavior: SnackBarBehavior.floating,
-                                          ),
-                                        );
                                       }
-                                    }
-
-                                    setDialogState(() {
-                                      isLoading = false;
-                                    });
+ 
+                                      setDialogState(() {
+                                        isLoading = false;
+                                      });
                                   },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
@@ -440,7 +1573,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               elevation: 4,
                               shadowColor: const Color(
                                 0xFF0651A4,
-                              ).withOpacity(isDarkMode ? 0.5 : 0.3),
+                              ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                             ),
                             child: isLoading
                                 ? const SizedBox(
@@ -484,7 +1617,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.grey[700]!.withOpacity(0.3) : Color(0xFF0651A4).withOpacity(0.1),
+              color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -514,7 +1647,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(isDarkMode ? 0.3 : 0.1),
+                color: Colors.red.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Text(
@@ -552,7 +1685,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -564,7 +1697,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
@@ -576,7 +1709,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
@@ -588,7 +1721,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: isDarkMode ? Colors.white.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.12),
                 ),
               ),
             ),
@@ -625,7 +1758,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               shadows: [
                                 Shadow(
                                   blurRadius: 10.0,
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   offset: const Offset(2, 2),
                                 ),
                               ],
@@ -639,11 +1772,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 16.0),
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                        color: isDarkMode ? Colors.grey[850]!.withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                            color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -680,7 +1813,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            '${_selectedBranch?.name} Inventory',
+                                            widget.showLowStockOnly ? 'Low Stock Items' : '${_selectedBranch?.name} Inventory',
                                             style: const TextStyle(
                                               fontSize: 20,
                                               fontWeight: FontWeight.bold,
@@ -751,6 +1884,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                         child: Text('SKU'),
                                       ),
                                       DropdownMenuItem(
+                                        value: 'brand',
+                                        child: Text('Brand'),
+                                      ),
+                                      DropdownMenuItem(
                                         value: 'branch',
                                         child: Text('Branch'),
                                       ),
@@ -774,14 +1911,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     filterValue.toLowerCase(),
                                                   );
                                             case 'date':
-                                              final formattedDate =
-                                                  '${item.dateAdded.year}-${item.dateAdded.month.toString().padLeft(2, '0')}-${item.dateAdded.day.toString().padLeft(2, '0')}';
+final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                               return formattedDate.contains(
                                                     filterValue,
                                                   ) ||
-                                                  item.dateAdded
-                                                      .toIso8601String()
-                                                      .contains(filterValue);
+                                                  item.dateAdded.contains(filterValue);
+                                            case 'brand':
+                                              return (item.brand ?? '')
+                                                  .toLowerCase()
+                                                  .contains(
+                                                    filterValue.toLowerCase(),
+                                                  );
                                             case 'branch':
                                               return _selectedBranch?.name
                                                       .toLowerCase()
@@ -834,13 +1974,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                 color: isDarkMode ? Colors.grey[800] : Colors.white,
                                                 shadowColor: const Color(
                                                   0xFF0651A4,
-                                                ).withOpacity(isDarkMode ? 0.5 : 0.2),
+                                                ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                                 child: ListTile(
                                                   leading: CircleAvatar(
                                                     backgroundColor:
                                                         const Color(
                                                           0xFF0651A4,
-                                                        ).withOpacity(isDarkMode ? 0.3 : 0.1),
+                                                        ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
                                                     child: const Icon(
                                                       Icons.inventory,
                                                       color: Color(0xFF0651A4),
@@ -859,7 +1999,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                     ),
                                                   ),
                                                   subtitle: Text(
-                                                    'SKU: ${item.sku} | Brand: ${item.brand}',
+'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),
@@ -871,14 +2011,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                           vertical: 6,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: item.end <= 10
+                                                      color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                           ? Colors.red
-                                                                .withOpacity(
-                                                                  isDarkMode ? 0.3 : 0.1,
+                                                                .withValues(
+                                                                  alpha: isDarkMode ? 0.3 : 0.1,
                                                                 )
                                                           : Colors.green
-                                                                .withOpacity(
-                                                                  isDarkMode ? 0.3 : 0.1,
+                                                                .withValues(
+                                                                  alpha: isDarkMode ? 0.3 : 0.1,
                                                                 ),
                                                       borderRadius:
                                                           BorderRadius.circular(
@@ -890,7 +2030,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                                                       style: TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        color: item.end <= 10
+                                                        color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                             ? Colors.red
                                                             : Colors.green,
                                                       ),
@@ -913,12 +2053,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ],
         ),
       ),
+floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _isExporting ? null : _exportInventoryToFile,
+              backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+              foregroundColor: Colors.white,
+              elevation: 8,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.download),
+              label: Text(_isExporting ? 'Exporting...' : 'Export to XLSX'),
+            )
+          : null,
     );
   }
 
-  @override
+@override
   void dispose() {
-    _updateSubscription?.cancel();
     super.dispose();
   }
 
@@ -967,12 +2125,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
+            border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3)),
             borderRadius: BorderRadius.circular(20),
             color: isDarkMode ? Colors.grey[800] : Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+                color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),
@@ -1005,12 +2163,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
-          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withOpacity(0.3)),
+          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3)),
           borderRadius: BorderRadius.circular(20),
           color: isDarkMode ? Colors.grey[800] : Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.1),
+              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

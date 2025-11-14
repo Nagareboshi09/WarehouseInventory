@@ -6,6 +6,7 @@ import 'package:drift/drift.dart' as drift;
 // Using Drift-generated classes instead of old model classes
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/screens/order_list_screen.dart';
 
 class OrderScreen extends StatefulWidget {
    final List<Order>? editBatch;
@@ -260,11 +261,134 @@ class _OrderScreenState extends State<OrderScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!'),
-          backgroundColor: Colors.green,
-        ),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 28,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Success!',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                fontSize: 16,
+              ),
+            ),
+            actions: [
+              // Stay on current screen button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // If editing, go back to order list
+                  if (widget.editBatch != null) {
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  
+                  // Reset form for new orders
+                  _formKey.currentState!.reset();
+                  // Don't clear location - keep it for continuity
+                  // Clear quantities
+                  for (var controller in _quantityControllers.values) {
+                    controller.clear();
+                  }
+                  setState(() {
+                    _orderQuantities.clear();
+                    if (widget.editBatch != null) {
+                      // For editing mode, reset only the filtered items
+                      for (var item in _filteredItems) {
+                        _orderQuantities[item.id ?? 0] = 0;
+                      }
+                    } else {
+                      // For new orders, reset all master items
+                      for (var item in _masterItems) {
+                        _orderQuantities[item.id ?? 0] = 0;
+                      }
+                    }
+                    _searchQuery = '';
+                    _filteredItems = _masterItems;
+                    _inventoryStock.clear();
+                    _itemSales.clear();
+                    // Restore the location field with the saved value
+                    _locationController.text = savedLocation;
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                  foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  'Continue',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              // Go to orders list button
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  
+                  // If editing, go back to order list
+                  if (widget.editBatch != null) {
+                    Navigator.of(context).pop();
+                    return;
+                  }
+                  
+                  // Navigate to order list screen with the submitted batch ID
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => OrderListScreen(initialBatchId: batchId),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  'View Orders',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
 
       // If editing, go back to order list

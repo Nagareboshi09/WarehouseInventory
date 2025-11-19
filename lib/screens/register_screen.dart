@@ -2,22 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
-import 'package:warehouse_inventory/screens/register_screen.dart';
+import 'package:warehouse_inventory/screens/login_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
+class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
@@ -37,42 +40,81 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _emailController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
       try {
-        final user = await AppDatabase.instance.getUser(
+        // Check if passwords match
+        if (_passwordController.text != _confirmPasswordController.text) {
+          if (!mounted) return;
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Passwords do not match'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Check password strength
+        if (_passwordController.text.length < 6) {
+          if (!mounted) return;
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Password must be at least 6 characters long'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Register the user
+        final user = await AppDatabase.instance.registerUser(
           _usernameController.text.trim(),
           _passwordController.text,
+          role: 'user', // Default role for new users
         );
 
         if (user != null) {
-          // Save login state
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('username', user.username);
-          await prefs.setString('role', user.role);
-
           if (!mounted) return;
 
-          // Navigate to home screen
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Registration successful! Please log in with your credentials.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+
+          // Navigate back to login screen
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
           );
         } else {
           if (!mounted) return;
 
-          // Show error message
+          // Show error message (username already exists)
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Invalid username or password'),
+              content: Text('Username already exists. Please choose a different username.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -174,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen>
                         return Transform.scale(
                           scale: _scaleAnimation.value,
                           child: Icon(
-                            Icons.inventory,
+                            Icons.person_add,
                             size: 80,
                             color: isDarkMode ? Colors.white70 : Colors.white,
                           ),
@@ -183,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen>
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Warehouse Inventory',
+                      'Create Account',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -216,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen>
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text(
-                                  'Welcome Back',
+                                  'Sign Up',
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,
@@ -226,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'Sign in to your account',
+                                  'Create your account to get started',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: isDarkMode ? Colors.white70 : Colors.grey,
@@ -264,10 +306,44 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your username';
+                                      return 'Please enter a username';
+                                    }
+                                    if (value.length < 3) {
+                                      return 'Username must be at least 3 characters';
                                     }
                                     return null;
                                   },
+                                ),
+                                const SizedBox(height: 20),
+                                TextFormField(
+                                  controller: _emailController,
+                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                  decoration: InputDecoration(
+                                    labelText: 'Email (Optional)',
+                                    labelStyle: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.email,
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    ),
+                                    filled: true,
+                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                  ),
+                                  keyboardType: TextInputType.emailAddress,
                                 ),
                                 const SizedBox(height: 20),
                                 TextFormField(
@@ -321,29 +397,98 @@ class _LoginScreenState extends State<LoginScreen>
                                   obscureText: !_isPasswordVisible,
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
+                                      return 'Please enter a password';
+                                    }
+                                    if (value.length < 6) {
+                                      return 'Password must be at least 6 characters';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                TextFormField(
+                                  controller: _confirmPasswordController,
+                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                  decoration: InputDecoration(
+                                    labelText: 'Confirm Password',
+                                    labelStyle: TextStyle(
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    prefixIcon: Icon(
+                                      Icons.lock_person,
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    ),
+                                    suffixIcon: Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      child: IconButton(
+                                        icon: Icon(
+                                          _isConfirmPasswordVisible
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          size: 24,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                          });
+                                        },
+                                        splashRadius: 24,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                  ),
+                                  obscureText: !_isConfirmPasswordVisible,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please confirm your password';
                                     }
                                     return null;
                                   },
                                 ),
                                 const SizedBox(height: 32),
                                 ElevatedButton(
-                                  onPressed: _isLoading ? null : _login,
+                                  onPressed: _isLoading ? null : _register,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     elevation: 6,
-                                    shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.4),
+                                    shadowColor: const Color(
+                                      0xFF0651A4,
+                                    ).withOpacity(isDarkMode ? 0.5 : 0.4),
                                   ),
                                   child: _isLoading
-                                      ? const CircularProgressIndicator(color: Colors.white)
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.white,
+                                        )
                                       : const Text(
-                                          'Login',
-                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                          'Create Account',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                 ),
                                 const SizedBox(height: 24),
@@ -351,21 +496,17 @@ class _LoginScreenState extends State<LoginScreen>
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Text(
-                                      'Don\'t have an account? ',
+                                      'Already have an account? ',
                                       style: TextStyle(
                                         color: isDarkMode ? Colors.white70 : Colors.grey,
                                       ),
                                     ),
                                     GestureDetector(
                                       onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const RegisterScreen(),
-                                          ),
-                                        );
+                                        Navigator.of(context).pop();
                                       },
                                       child: Text(
-                                        'Sign Up',
+                                        'Sign In',
                                         style: TextStyle(
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                           fontWeight: FontWeight.bold,

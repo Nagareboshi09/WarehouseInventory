@@ -73,6 +73,8 @@ dependencies:
   permission_handler: ^11.1.0
   
   # Device information for Android compatibility
+  # Crypto for password hashing
+  crypto: ^3.0.6
   device_info_plus: ^9.1.1
   
   # Performance optimization for large file processing

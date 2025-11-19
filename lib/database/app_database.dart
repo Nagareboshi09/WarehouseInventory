@@ -7,21 +7,21 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:bcrypt/bcrypt.dart';
 
 part 'app_database.g.dart';
 
-// Password hashing utilities
+// Password hashing utilities using bcrypt
 class PasswordUtils {
   static String hashPassword(String password) {
-    // Use SHA-256 for password hashing
-    final bytes = utf8.encode(password);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
+    // Use bcrypt for secure password hashing
+    final hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+    return hashedPassword;
   }
 
   static bool verifyPassword(String plainPassword, String hashedPassword) {
-    final hashedInput = hashPassword(plainPassword);
-    return hashedInput == hashedPassword;
+    // Verify password using bcrypt
+    return BCrypt.checkpw(plainPassword, hashedPassword);
   }
 }
 

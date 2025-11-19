@@ -47,6 +47,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   bool _addingItem = false;
   final List<MasterItem> _masterItems = [];
   final List<int> _masterItemQuantities = [];
+  final List<int?> _masterItemBegQuantities = [];
+  final List<int?> _masterItemPrevQuantities = [];
+  final List<int?> _masterItemSalesQuantities = [];
   String? _codeErrorMessage;
 
   bool get _isFormValid {
@@ -185,6 +188,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     setState(() {
       _masterItems.add(masterItem);
       _masterItemQuantities.add(quantity);
+      _masterItemBegQuantities.add(null); // Will be null for manually added items
+      _masterItemPrevQuantities.add(null);
+      _masterItemSalesQuantities.add(null);
       _skuController.clear();
       _descriptionController.clear();
       _brandController.clear();
@@ -197,6 +203,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
     setState(() {
       _masterItems.removeAt(index);
       _masterItemQuantities.removeAt(index);
+      _masterItemBegQuantities.removeAt(index);
+      _masterItemPrevQuantities.removeAt(index);
+      _masterItemSalesQuantities.removeAt(index);
     });
   }
 
@@ -414,6 +423,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             headerMap['quantity'] ??
             headerMap['qty'] ??
             headerMap['stock'];
+        
+        // Detect additional quantity-related headers
+        final begIndex = headerMap['beg'] ?? headerMap['beginning'] ?? headerMap['begin'];
+        final prevIndex = headerMap['prev'] ?? headerMap['previous'];
+        final salesIndex = headerMap['sales'] ?? headerMap['sale'];
 
         // Debug: Show detected headers
         _logger.info('Detected headers: $headerMap');
@@ -428,6 +442,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
         List<MasterItem> importedItems = [];
         List<int> importedQuantities = [];
+        List<int?> importedBegQuantities = [];
+        List<int?> importedPrevQuantities = [];
+        List<int?> importedSalesQuantities = [];
 
         // Progress tracking for large datasets
         setState(() {
@@ -466,7 +483,24 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 : '';
             final qty = qtyStr.isEmpty ? null : num.tryParse(qtyStr)?.round();
 
+            // Extract additional quantity-related fields
+            final begStr = (begIndex != null && row.length > begIndex)
+                ? cellText(row[begIndex]).replaceAll(',', '').trim()
+                : '';
+            final beg = begStr.isEmpty ? null : num.tryParse(begStr)?.round();
+            
+            final prevStr = (prevIndex != null && row.length > prevIndex)
+                ? cellText(row[prevIndex]).replaceAll(',', '').trim()
+                : '';
+            final prev = prevStr.isEmpty ? null : num.tryParse(prevStr)?.round();
+            
+            final salesStr = (salesIndex != null && row.length > salesIndex)
+                ? cellText(row[salesIndex]).replaceAll(',', '').trim()
+                : '';
+            final sales = salesStr.isEmpty ? null : num.tryParse(salesStr)?.round();
+
             _logger.info('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
+            _logger.info('Row $rowIndex - Beg: $beg, Prev: $prev, Sales: $sales');
 
 
             // Skip section headers like "Bronco" rows without SKU or empty description
@@ -507,6 +541,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
             importedItems.add(masterItem);
             importedQuantities.add(qty ?? 0); // Use 0 as default for the list, but preserve null for DB
+            importedBegQuantities.add(beg);
+            importedPrevQuantities.add(prev);
+            importedSalesQuantities.add(sales);
           }
 
           // Yield to event loop to prevent UI freezing on low-spec devices
@@ -531,6 +568,9 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         setState(() {
           _masterItems.addAll(importedItems);
           _masterItemQuantities.addAll(importedQuantities);
+          _masterItemBegQuantities.addAll(importedBegQuantities);
+          _masterItemPrevQuantities.addAll(importedPrevQuantities);
+          _masterItemSalesQuantities.addAll(importedSalesQuantities);
         });
 
         Navigator.of(context).pop(); // Close progress dialog
@@ -714,7 +754,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               branchId: branchId,
             ));
 
-            // Insert into inventory_items
+            // Insert into inventory_items with additional quantity fields
             await db.into(db.inventoryItems).insert(InventoryItemsCompanion.insert(
               sku: item.sku,
               description: item.description,
@@ -723,6 +763,15 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               brand: item.brand != null ? drift.Value(item.brand) : const drift.Value.absent(),
               dateAdded: DateTime.now().toIso8601String(),
               branchId: branchId,
+              beg: _masterItemBegQuantities.isNotEmpty && _masterItemBegQuantities.length > j
+                  ? drift.Value(_masterItemBegQuantities[j])
+                  : const drift.Value.absent(),
+              prev: _masterItemPrevQuantities.isNotEmpty && _masterItemPrevQuantities.length > j
+                  ? drift.Value(_masterItemPrevQuantities[j])
+                  : const drift.Value.absent(),
+              sales: _masterItemSalesQuantities.isNotEmpty && _masterItemSalesQuantities.length > j
+                  ? drift.Value(_masterItemSalesQuantities[j])
+                  : const drift.Value.absent(),
             ));
           }
           
@@ -1174,7 +1223,19 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                     ),
                                     child: ListTile(
                                       title: Text('${item.sku} - ${item.description}'),
-                                      subtitle: Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location} - Qty: ${_masterItemQuantities[index]}'),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location}'),
+                                          Text(
+                                            'End: ${_masterItemQuantities[index]}' +
+                                            (_masterItemBegQuantities[index] != null ? ' | Beg: ${_masterItemBegQuantities[index]}' : '') +
+                                            (_masterItemPrevQuantities[index] != null ? ' | Prev: ${_masterItemPrevQuantities[index]}' : '') +
+                                            (_masterItemSalesQuantities[index] != null ? ' | Sales: ${_masterItemSalesQuantities[index]}' : ''),
+                                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
                                       trailing: IconButton(
                                         icon: const Icon(Icons.delete, color: Colors.red),
                                         onPressed: () => _removeMasterItem(index),

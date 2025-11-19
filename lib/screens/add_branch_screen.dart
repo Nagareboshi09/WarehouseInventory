@@ -468,9 +468,11 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
 
             _logger.info('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
 
+
             // Skip section headers like "Bronco" rows without SKU or empty description
-            if (sku.isEmpty || description.isEmpty) {
-              _logger.info('Skipping row $rowIndex - empty SKU or description');
+            // Also skip rows where SKU is not a number
+            if (sku.isEmpty || description.isEmpty || int.tryParse(sku) == null) {
+              _logger.info('Skipping row $rowIndex - empty SKU/description or non-numeric SKU');
               continue;
             }
 

@@ -1228,10 +1228,10 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                         children: [
                                           Text('${item.brand != null && item.brand!.isNotEmpty ? '${item.brand} - ' : ''}${item.location}'),
                                           Text(
-                                            'End: ${_masterItemQuantities[index]}' +
-                                            (_masterItemBegQuantities[index] != null ? ' | Beg: ${_masterItemBegQuantities[index]}' : '') +
-                                            (_masterItemPrevQuantities[index] != null ? ' | Prev: ${_masterItemPrevQuantities[index]}' : '') +
-                                            (_masterItemSalesQuantities[index] != null ? ' | Sales: ${_masterItemSalesQuantities[index]}' : ''),
+                                            'End: ${_masterItemQuantities[index]}'
+                                            '${_masterItemBegQuantities[index] != null ? ' | Beg: ${_masterItemBegQuantities[index]}' : ''}'
+                                            '${_masterItemPrevQuantities[index] != null ? ' | Prev: ${_masterItemPrevQuantities[index]}' : ''}'
+                                            '${_masterItemSalesQuantities[index] != null ? ' | Sales: ${_masterItemSalesQuantities[index]}' : ''}',
                                             style: const TextStyle(fontSize: 12, color: Colors.grey),
                                           ),
                                         ],

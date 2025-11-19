@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 import 'package:logging/logging.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:warehouse_inventory/utils/user_helper.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
@@ -365,6 +366,33 @@ Future<void> _loadInventoryItems() async {
                   fontSize: 14,
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: isDarkMode ? 0.2 : 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Includes user export information',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
               Text(
                 'What would you like to do?',
@@ -392,7 +420,7 @@ Future<void> _loadInventoryItems() async {
                   await Share.shareXFiles(
                     [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
                     subject: 'Inventory Export - ${_selectedBranch!.name}',
-                    text: 'Here is the inventory export for ${_selectedBranch!.name}',
+                    text: 'Here is the inventory export for ${_selectedBranch!.name}. This export includes user information for accountability.',
                   );
                 } catch (e) {
                   if (mounted) {
@@ -453,6 +481,15 @@ Future<void> _loadInventoryItems() async {
     String fileName,
   ) async {
     try {
+      // Get current user information
+      final userInfo = await UserHelper.getCurrentUser();
+      final username = userInfo?['username'] ?? 'Unknown User';
+      final userRole = userInfo?['role'] ?? 'user';
+      final currentTimestamp = DateTime.now().toIso8601String();
+      
+      // Log the export activity
+      _logger.info('📤 Export initiated by user: $username (Role: $userRole) for branch: ${_selectedBranch?.name}');
+      
       // Create Excel workbook
       final excel = Excel.createExcel();
       
@@ -466,6 +503,14 @@ Future<void> _loadInventoryItems() async {
         final brandB = (b.brand ?? 'N/A').toLowerCase();
         return brandA.compareTo(brandB);
       });
+      
+      // Add export metadata at the top
+      sheet.appendRow(['Inventory Export Information']);
+      sheet.appendRow(['Exported by:', username]);
+      sheet.appendRow(['User Role:', userRole]);
+      sheet.appendRow(['Export Date:', DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())]);
+      sheet.appendRow(['Branch:', _selectedBranch?.name ?? 'Unknown']);
+      sheet.appendRow(['']); // Empty row for spacing
       
       // Add headers
       sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);

@@ -504,14 +504,6 @@ Future<void> _loadInventoryItems() async {
         return brandA.compareTo(brandB);
       });
       
-      // Add export metadata at the top
-      sheet.appendRow(['Inventory Export Information']);
-      sheet.appendRow(['Exported by:', username]);
-      sheet.appendRow(['User Role:', userRole]);
-      sheet.appendRow(['Export Date:', DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())]);
-      sheet.appendRow(['Branch:', _selectedBranch?.name ?? 'Unknown']);
-      sheet.appendRow(['']); // Empty row for spacing
-      
       // Add headers
       sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
       
@@ -540,6 +532,14 @@ Future<void> _loadInventoryItems() async {
           await Future.delayed(const Duration(milliseconds: 1));
         }
       }
+
+      // Add user information at the bottom of the file
+      sheet.appendRow(['']); // Empty row for spacing
+      sheet.appendRow(['Export Information']);
+      sheet.appendRow(['Prepared by:', username]);
+      sheet.appendRow(['Code', _selectedBranch?.code ?? 'Unknown']);
+      sheet.appendRow(['Export Date:', DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())]);
+      sheet.appendRow(['Branch:', _selectedBranch?.name ?? 'Unknown']);
 
       // Encode Excel data once
       final bytes = excel.encode();

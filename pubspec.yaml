@@ -99,6 +99,9 @@ dev_dependencies:
   drift_dev: ^2.14.1
   build_runner: ^2.4.12
   flutter_lints: ^5.0.0
+  
+  # Launcher icons generation
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/glossary#package顶部

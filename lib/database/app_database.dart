@@ -299,6 +299,20 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // Update user password
+  Future<bool> updateUserPassword(String username, String newPassword) async {
+    try {
+      final hashedPassword = PasswordUtils.hashPassword(newPassword);
+      final updatedRows = await (update(users)
+        ..where((u) => u.username.equals(username)))
+        .write(UsersCompanion(password: Value(hashedPassword)));
+      return updatedRows > 0;
+    } catch (e) {
+      print('Error updating user password: $e');
+      return false;
+    }
+  }
+
   // Branch methods
   Future<List<Branch>> getAllBranches() async {
     final result = await select(branches).get();

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:warehouse_inventory/theme_notifier.dart';
-// Removed database import - settings_screen.dart only uses SharedPreferences
+import 'package:warehouse_inventory/database/app_database.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

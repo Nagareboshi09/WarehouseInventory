@@ -13,7 +13,7 @@ class OrderScreen extends StatefulWidget {
 
    @override
    State<OrderScreen> createState() => _OrderScreenState();
- }
+}
 
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -184,249 +184,254 @@ class _OrderScreenState extends State<OrderScreen> {
       _isLoading = true;
     });
 
-    // If editing, delete existing orders first
-    if (widget.editBatch != null) {
-      try {
+    try {
+      // If editing, delete existing orders first
+      if (widget.editBatch != null) {
         for (final order in widget.editBatch!) {
           await AppDatabase.instance.deleteOrder(order.id);
         }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating orders: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
+      }
+
+      // Generate a unique batch ID for this order session (or use existing if editing)
+      final batchId = widget.editBatch != null
+          ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
+          : DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Preserve the location value before form reset
+      final savedLocation = _locationController.text.trim();
+
+      // Create orders for each item with quantity > 0
+      List<OrdersCompanion> orderCompanions = [];
+      // Use filtered items if editing, otherwise use all master items
+      final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
+      for (var item in itemsToProcess) {
+        int quantity = _orderQuantities[item.id ?? 0] ?? 0;
+        if (quantity > 0) {
+          final orderCompanion = OrdersCompanion.insert(
+            branchId: _selectedBranch?.id ?? 0,
+            location: _locationController.text.trim(),
+            brand: item.brand ?? '',
+            itemId: item.id ?? 0,
+            quantity: quantity,
+            dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
+            status: const drift.Value('pending'),
+            batchId: drift.Value(batchId),
           );
+          orderCompanions.add(orderCompanion);
         }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
       }
-    }
 
-    // Generate a unique batch ID for this order session (or use existing if editing)
-    final batchId = widget.editBatch != null
-        ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
-        : DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Preserve the location value before form reset
-    final savedLocation = _locationController.text.trim();
-
-    // Create orders for each item with quantity > 0
-    List<OrdersCompanion> orderCompanions = [];
-    // Use filtered items if editing, otherwise use all master items
-    final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
-    for (var item in itemsToProcess) {
-      int quantity = _orderQuantities[item.id ?? 0] ?? 0;
-      if (quantity > 0) {
-        final orderCompanion = OrdersCompanion.insert(
-          branchId: _selectedBranch?.id ?? 0,
-          location: _locationController.text.trim(),
-          brand: item.brand ?? '',
-          itemId: item.id ?? 0,
-          quantity: quantity,
-          dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
-          status: const drift.Value('pending'),
-          batchId: drift.Value(batchId),
-        );
-        orderCompanions.add(orderCompanion);
-      }
-    }
-
-    // Add orders to provider
-    try {
+      // Add orders to database
       for (var orderCompanion in orderCompanions) {
         await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
+      }
+
+      // Simulate order submission
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+            return AlertDialog(
+              backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 28,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Success!',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                  fontSize: 16,
+                ),
+              ),
+              actions: widget.editBatch != null
+                  ? [
+                      // Cancel button for edit mode
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                          foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      // View Orders button for edit mode - directs to order list screen
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => OrderListScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'View Orders',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ]
+                  : [
+                      // Two buttons for create mode
+                      // Stay on current screen button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          
+                          // Reset form for new orders
+                          _formKey.currentState!.reset();
+                          // Don't clear location - keep it for continuity
+                          // Clear quantities
+                          for (var controller in _quantityControllers.values) {
+                            controller.clear();
+                          }
+                          setState(() {
+                            _orderQuantities.clear();
+                            // For new orders, reset all master items
+                            for (var item in _masterItems) {
+                              _orderQuantities[item.id ?? 0] = 0;
+                            }
+                            _searchQuery = '';
+                            _filteredItems = _masterItems;
+                            _inventoryStock.clear();
+                            _itemSales.clear();
+                            // Restore the location field with the saved value
+                            _locationController.text = savedLocation;
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                          foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      // Go to orders list button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          
+                          // Navigate to order list screen with the submitted batch ID
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => OrderListScreen(initialBatchId: batchId),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'View Orders',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+            );
+          },
+        );
+
+        // Reset form for new orders (only for create mode)
+        if (widget.editBatch == null) {
+          _formKey.currentState!.reset();
+          // Don't clear location - keep it for continuity
+          // Clear quantities
+          for (var controller in _quantityControllers.values) {
+            controller.clear();
+          }
+          setState(() {
+            _orderQuantities.clear();
+            // For new orders, reset all master items
+            for (var item in _masterItems) {
+              _orderQuantities[item.id ?? 0] = 0;
+            }
+            _searchQuery = '';
+            _filteredItems = _masterItems;
+            _inventoryStock.clear();
+            _itemSales.clear();
+            // Restore the location field with the saved value
+            _locationController.text = savedLocation;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving orders: ${e.toString()}'),
+            content: Text('Error ${widget.editBatch != null ? 'updating' : 'saving'} orders: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    // Simulate order submission
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-          return AlertDialog(
-            backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 28,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Success!',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
-            content: Text(
-              widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                fontSize: 16,
-              ),
-            ),
-            actions: [
-              // Stay on current screen button
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  // If editing, go back to order list
-                  if (widget.editBatch != null) {
-                    Navigator.of(context).pop();
-                    return;
-                  }
-                  
-                  // Reset form for new orders
-                  _formKey.currentState!.reset();
-                  // Don't clear location - keep it for continuity
-                  // Clear quantities
-                  for (var controller in _quantityControllers.values) {
-                    controller.clear();
-                  }
-                  setState(() {
-                    _orderQuantities.clear();
-                    if (widget.editBatch != null) {
-                      // For editing mode, reset only the filtered items
-                      for (var item in _filteredItems) {
-                        _orderQuantities[item.id ?? 0] = 0;
-                      }
-                    } else {
-                      // For new orders, reset all master items
-                      for (var item in _masterItems) {
-                        _orderQuantities[item.id ?? 0] = 0;
-                      }
-                    }
-                    _searchQuery = '';
-                    _filteredItems = _masterItems;
-                    _inventoryStock.clear();
-                    _itemSales.clear();
-                    // Restore the location field with the saved value
-                    _locationController.text = savedLocation;
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-                  foregroundColor: isDarkMode ? Colors.white : Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  'Continue',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              // Go to orders list button
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  // If editing, go back to order list
-                  if (widget.editBatch != null) {
-                    Navigator.of(context).pop();
-                    return;
-                  }
-                  
-                  // Navigate to order list screen with the submitted batch ID
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => OrderListScreen(initialBatchId: batchId),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  'View Orders',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      // If editing, go back to order list
-      if (widget.editBatch != null) {
-        Navigator.of(context).pop();
-        return;
+    } finally {
+      // Always reset loading state
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
-
-      // Reset form for new orders
-      _formKey.currentState!.reset();
-      // Don't clear location - keep it for continuity
-      // Clear quantities
-      for (var controller in _quantityControllers.values) {
-        controller.clear();
-      }
-      setState(() {
-        _orderQuantities.clear();
-        if (widget.editBatch != null) {
-          // For editing mode, reset only the filtered items
-          for (var item in _filteredItems) {
-            _orderQuantities[item.id ?? 0] = 0;
-          }
-        } else {
-          // For new orders, reset all master items
-          for (var item in _masterItems) {
-            _orderQuantities[item.id ?? 0] = 0;
-          }
-        }
-        _searchQuery = '';
-        _filteredItems = _masterItems;
-        _inventoryStock.clear();
-        _itemSales.clear();
-        // Restore the location field with the saved value
-        _locationController.text = savedLocation;
-      });
     }
-
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override

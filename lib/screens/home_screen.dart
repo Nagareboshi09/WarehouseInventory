@@ -4,7 +4,7 @@ import 'package:warehouse_inventory/screens/dashboard_screen.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
 import 'package:warehouse_inventory/screens/master_data_screen.dart';
 import 'package:warehouse_inventory/screens/settings_screen.dart';
-import 'package:warehouse_inventory/screens/order_screen.dart';
+import 'package:warehouse_inventory/screens/account_screen.dart';
 import 'package:warehouse_inventory/screens/order_list_screen.dart';
 import 'package:warehouse_inventory/screens/login_screen.dart';
 
@@ -22,11 +22,18 @@ class _HomeScreenState extends State<HomeScreen> {
   String _username = '';
   String _role = '';
 
-  final List<Widget> _screens = [
+  final List<Widget> _adminScreens = [
     const DashboardScreen(),
     const MasterDataScreen(),
     const InventoryScreen(),
-    const OrderScreen(),
+    const AccountScreen(),
+    const OrderListScreen(),
+    const SettingsScreen(),
+  ];
+
+  final List<Widget> _userScreens = [
+    const DashboardScreen(),
+    const InventoryScreen(),
     const OrderListScreen(),
     const SettingsScreen(),
   ];
@@ -98,6 +105,18 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Filter screens and menu items based on user role
+    final isAdmin = _role.toLowerCase() == 'admin';
+    final availableScreens = isAdmin ? _adminScreens : _userScreens;
+    
+    // Adjust selected index if user doesn't have access to current screen
+    int adjustedIndex = _selectedIndex;
+    if (!isAdmin && _selectedIndex >= 2) {
+      // If user is regular and current index is out of bounds, adjust to dashboard
+      adjustedIndex = 0;
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Warehouse Inventory'),
@@ -179,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildDrawerItem(
                       icon: Icons.dashboard,
                       title: 'Dashboard',
-                      isSelected: _selectedIndex == 0,
+                      isSelected: adjustedIndex == 0,
                       onTap: () {
                         setState(() {
                           _selectedIndex = 0;
@@ -188,53 +207,60 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       isDarkMode: isDarkMode,
                     ),
+
                     const SizedBox(height: 8),
-                    _buildDrawerItem(
-                      icon: Icons.category,
-                      title: 'Master Data',
-                      isSelected: _selectedIndex == 1,
-                      onTap: () {
-                        setState(() {
-                          _selectedIndex = 1;
-                        });
-                        Navigator.pop(context);
-                      },
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 8),
+                    // Only show Master Data menu for admin users
+                    if (isAdmin) ...[
+                      _buildDrawerItem(
+                        icon: Icons.data_object,
+                        title: 'Master Data',
+                        isSelected: adjustedIndex == 1,
+                        onTap: () {
+                          setState(() {
+                            _selectedIndex = 1;
+                          });
+                          Navigator.pop(context);
+                        },
+                        isDarkMode: isDarkMode,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     _buildDrawerItem(
                       icon: Icons.inventory,
                       title: 'Inventory',
-                      isSelected: _selectedIndex == 2,
+                      isSelected: adjustedIndex == (isAdmin ? 2 : 1),
                       onTap: () {
                         setState(() {
-                          _selectedIndex = 2;
+                          _selectedIndex = isAdmin ? 2 : 1;
                         });
                         Navigator.pop(context);
                       },
                       isDarkMode: isDarkMode,
                     ),
-                    const SizedBox(height: 8),
-                    _buildDrawerItem(
-                      icon: Icons.shopping_cart,
-                      title: 'Orders',
-                      isSelected: _selectedIndex == 3,
-                      onTap: () {
-                        setState(() {
-                          _selectedIndex = 3;
-                        });
-                        Navigator.pop(context);
-                      },
-                      isDarkMode: isDarkMode,
-                    ),
+                    // Only show Accounts menu for admin users
+                    if (isAdmin) ...[
+                      const SizedBox(height: 8),
+                      _buildDrawerItem(
+                        icon: Icons.person_add,
+                        title: 'Accounts',
+                        isSelected: adjustedIndex == 3,
+                        onTap: () {
+                          setState(() {
+                            _selectedIndex = 3;
+                          });
+                          Navigator.pop(context);
+                        },
+                        isDarkMode: isDarkMode,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     _buildDrawerItem(
                       icon: Icons.list_alt,
                       title: 'Order List',
-                      isSelected: _selectedIndex == 4,
+                      isSelected: adjustedIndex == (isAdmin ? 4 : 2),
                       onTap: () {
                         setState(() {
-                          _selectedIndex = 4;
+                          _selectedIndex = isAdmin ? 4 : 2;
                         });
                         Navigator.pop(context);
                       },
@@ -244,10 +270,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildDrawerItem(
                       icon: Icons.settings,
                       title: 'Settings',
-                      isSelected: _selectedIndex == 5,
+                      isSelected: adjustedIndex == (isAdmin ? 5 : 3),
                       onTap: () {
                         setState(() {
-                          _selectedIndex = 5;
+                          _selectedIndex = isAdmin ? 5 : 3;
                         });
                         Navigator.pop(context);
                       },
@@ -271,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: _screens[_selectedIndex],
+      body: availableScreens[_selectedIndex],
     );
   }
 }

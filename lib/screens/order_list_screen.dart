@@ -112,10 +112,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const AccountScreen(),
+                  builder: (_) => const InventoryScreen(),
                 ),
               ).then((_) {
-                // Refresh orders after returning from order screen
+                // Refresh orders after returning from inventory screen
                 if (mounted) {
                   Provider.of<OrderProvider>(context, listen: false).loadOrders();
                 }
@@ -124,7 +124,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             backgroundColor: const Color(0xFF0651A4),
             foregroundColor: Colors.white,
             elevation: 6,
-            tooltip: 'Go to Order Screen',
+            tooltip: 'Go to Inventory Screen',
             child: const Icon(Icons.shopping_cart),
           ) : Row(
             mainAxisSize: MainAxisSize.min,

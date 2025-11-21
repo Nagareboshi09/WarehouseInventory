@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:warehouse_inventory/screens/account_screen.dart';
+import 'package:warehouse_inventory/screens/inventory_screen.dart';
 
 
 class OrderListScreen extends StatefulWidget {
@@ -132,10 +133,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 onPressed: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const OrderScreen(),
+                      builder: (_) => const InventoryScreen(),
                     ),
                   ).then((_) {
-                    // Refresh orders after returning from order screen
+                    // Refresh orders after returning from inventory screen
                     if (mounted) {
                       context.read<OrderProvider>().loadOrders();
                     }
@@ -144,9 +145,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 backgroundColor: const Color(0xFF0651A4),
                 foregroundColor: Colors.white,
                 elevation: 6,
-                tooltip: 'Go to Order Screen',
+                tooltip: 'Go to Inventory Screen',
                 heroTag: "add_order",
-                child: const Icon(Icons.shopping_cart),
+                child: const Icon(Icons.inventory),
               ),
             ],
           ),

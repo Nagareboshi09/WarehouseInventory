@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:warehouse_inventory/screens/account_screen.dart';
 import 'package:warehouse_inventory/screens/inventory_screen.dart';
+import 'package:warehouse_inventory/screens/order_screen.dart';
 
 
 class OrderListScreen extends StatefulWidget {
@@ -23,11 +24,12 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  String? _selectedBranch;
-  String? _selectedProduct;
-  List<Branch> _branches = [];
-  String _searchQuery = '';
-  String? _filterBatchId;
+   String? _selectedBranch;
+   String? _selectedProduct;
+   List<Branch> _branches = [];
+   String _searchQuery = '';
+   String? _filterBatchId;
+   Map<int, Map<String, String>> _itemDetails = {};
 
   @override
   void initState() {
@@ -38,6 +40,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       if (mounted) {
         context.read<OrderProvider>().loadOrders();
         _loadBranches();
+        _loadItems();
       }
     });
   }
@@ -47,6 +50,28 @@ class _OrderListScreenState extends State<OrderListScreen> {
     if (mounted) {
       setState(() {
         _branches = branches..sort((a, b) => a.id.compareTo(b.id));
+      });
+    }
+  }
+
+  Future<void> _loadItems() async {
+    final masterItems = await AppDatabase.instance.getAllMasterItems();
+    final inventoryItems = await AppDatabase.instance.getAllInventoryItems();
+    if (mounted) {
+      setState(() {
+        _itemDetails = {};
+        for (final item in masterItems) {
+          _itemDetails[item.id] = {
+            'sku': item.sku,
+            'description': item.description,
+          };
+        }
+        for (final item in inventoryItems) {
+          _itemDetails[item.id] = {
+            'sku': item.sku,
+            'description': item.description,
+          };
+        }
       });
     }
   }
@@ -79,24 +104,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
         final branchIds = allOrders.map((o) => o.branchId).toSet().toList()..sort();
         final products = allOrders.map((o) => o.brand).toSet().toList()..sort();
 
-        // Group orders by batchId
-        final orderBatches = <String, List<Order>>{};
-        for (final order in orders) {
-          final batchId = order.batchId ?? 'single_${order.id}';
-          if (!orderBatches.containsKey(batchId)) {
-            orderBatches[batchId] = [];
-          }
-          orderBatches[batchId]!.add(order);
-        }
 
-        final batchList = orderBatches.entries.toList()
-          ..sort(
-            (a, b) =>
-                b.value.first.dateOrdered.compareTo(a.value.first.dateOrdered),
-          );
+        final sortedOrders = orders..sort((a, b) => b.dateOrdered.compareTo(a.dateOrdered));
 
         return Scaffold(
-          floatingActionButton: batchList.isEmpty ? FloatingActionButton(
+          floatingActionButton: orders.isEmpty ? FloatingActionButton(
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -305,7 +317,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: batchList.isEmpty
+                        child: orders.isEmpty
                             ? Center(
                                 child: Padding(
                                   padding: const EdgeInsets.all(24.0),
@@ -357,25 +369,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 padding: EdgeInsets.all(
                                   isSmallScreen ? 16.0 : 24.0,
                                 ),
-                                itemCount: batchList.length,
+                                itemCount: sortedOrders.length,
                                 itemBuilder: (context, index) {
-                                  final batchEntry = batchList[index];
-                                  final batchOrders = batchEntry.value;
-                                  final firstOrder = batchOrders.first;
-                                  final totalItems = batchOrders.length;
-                                  final totalQuantity = batchOrders.fold(
-                                    0,
-                                    (sum, order) => sum + order.quantity,
-                                  );
-                                  
+                                  final order = sortedOrders[index];
+                                  final itemDetails = _itemDetails[order.itemId];
+                                  final description = itemDetails?['description'] ?? 'Unknown Item';
+                                  final sku = itemDetails?['sku'] ?? 'Unknown SKU';
+
                                   // Parse date string for display
-                                  DateTime? firstOrderDate;
+                                  DateTime? orderDate;
                                   try {
-                                    firstOrderDate = DateTime.parse(firstOrder.dateOrdered);
+                                    orderDate = DateTime.parse(order.dateOrdered);
                                   } catch (e) {
-                                    firstOrderDate = null;
+                                    orderDate = null;
                                   }
-                                  
+
                                   return Card(
                                     elevation: 6,
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -386,160 +394,140 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     shadowColor: const Color(
                                       0xFF0651A4,
                                     ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
-                                    child: InkWell(
-                                      onTap: () => _showBatchDetails(
-                                        context,
-                                        batchOrders,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(20.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(
-                                                    12,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          15,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.inventory_2,
-                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                    size: 24,
-                                                  ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(20.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  12,
                                                 ),
-                                                const SizedBox(width: 16),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        'Order Batch',
-                                                        style: TextStyle(
-                                                          fontSize: 18,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                                                        ),
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        15,
                                                       ),
-                                                      Text(
-                                                        '$totalItems item${totalItems > 1 ? 's' : ''} • Total: $totalQuantity units',
-                                                        style: TextStyle(
-                                                          fontSize: 14,
-                                                          color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
                                                 ),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          15,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    firstOrderDate != null 
-                                                        ? '${firstOrderDate.day}/${firstOrderDate.month}/${firstOrderDate.year}'
-                                                        : firstOrder.dateOrdered,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
+                                                child: Icon(
+                                                  Icons.inventory_2,
+                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                  size: 24,
                                                 ),
-                                              ],
-                                            ),
-                                            const Divider(height: 20),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: _buildInfoItem(
-                                                    'Branch',
-                                                    _branches.firstWhere(
-                                                      (b) => b.id == firstOrder.branchId,
-                                                      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
-                                                    ).name,
-                                                    isDarkMode: isDarkMode,
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: _buildInfoItem(
-                                                    'Location',
-                                                    firstOrder.location,
-                                                    isDarkMode: isDarkMode,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 6,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                      borderRadius:
-                                                          BorderRadius.circular(15),
-                                                    ),
-                                                    child: Text(
-                                                      'Tap to view order details',
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .start,
+                                                  children: [
+                                                    Text(
+                                                      description,
                                                       style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                        fontStyle: FontStyle.italic,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      'SKU: $sku • Qty: ${order.quantity}',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
                                                       ),
                                                     ),
-                                                  ),
+                                                  ],
                                                 ),
-                                                const SizedBox(width: 8),
-                                                IconButton(
-                                                  onPressed: () => _editOrderBatch(batchOrders),
-                                                  icon: Icon(
-                                                    Icons.edit,
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        15,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  orderDate != null
+                                                      ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
+                                                      : order.dateOrdered,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
                                                     color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                    size: 20,
+                                                    fontWeight:
+                                                        FontWeight.bold,
                                                   ),
-                                                  tooltip: 'Edit Order',
                                                 ),
-                                                IconButton(
-                                                  onPressed: () => _deleteOrderBatch(batchOrders),
-                                                  icon: Icon(
-                                                    Icons.delete,
-                                                    color: Colors.red,
-                                                    size: 20,
-                                                  ),
-                                                  tooltip: 'Delete Order',
+                                              ),
+                                            ],
+                                          ),
+                                          const Divider(height: 20),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Branch',
+                                                  _branches.firstWhere(
+                                                    (b) => b.id == order.branchId,
+                                                    orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: ''),
+                                                  ).name,
+                                                  isDarkMode: isDarkMode,
                                                 ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
+                                              ),
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Location',
+                                                  order.location,
+                                                  isDarkMode: isDarkMode,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Brand',
+                                                  order.brand,
+                                                  isDarkMode: isDarkMode,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                onPressed: () => _editSingleOrder(order),
+                                                icon: Icon(
+                                                  Icons.edit,
+                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'Edit Order',
+                                              ),
+                                              IconButton(
+                                                onPressed: () => _deleteSingleOrder(order),
+                                                icon: Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'Delete Order',
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -1052,11 +1040,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _editOrderBatch(List<Order> batchOrders) {
-    // Navigate to order screen with pre-filled data for editing
+
+  void _editSingleOrder(Order order) {
+    // Navigate to order screen with the specific order for editing
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AccountScreen(editUser: null),
+        builder: (_) => OrderScreen(editOrder: order),
       ),
     ).then((_) {
       // Refresh orders after returning from edit screen
@@ -1066,7 +1055,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
     });
   }
 
-  void _deleteOrderBatch(List<Order> batchOrders) {
+
+
+  void _deleteSingleOrder(Order order) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
@@ -1074,13 +1065,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
         return AlertDialog(
           backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
           title: Text(
-            'Delete Order Batch',
+            'Delete Order',
             style: TextStyle(
               color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
             ),
           ),
           content: Text(
-            'Are you sure you want to delete this order batch with ${batchOrders.length} items?',
+            'Are you sure you want to delete this order?',
             style: TextStyle(
               color: isDarkMode ? Colors.white70 : Colors.black87,
             ),
@@ -1099,15 +1090,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
               onPressed: () async {
                 Navigator.of(context).pop();
                 try {
-                  for (final order in batchOrders) {
-                    await AppDatabase.instance.deleteOrder(order.id);
-                  }
+                  await AppDatabase.instance.deleteOrder(order.id);
                   // Refresh the orders list
                   if (mounted) {
                     context.read<OrderProvider>().loadOrders();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Order batch deleted successfully'),
+                        content: Text('Order deleted successfully'),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -1116,7 +1105,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error deleting order batch: ${e.toString()}'),
+                        content: Text('Error deleting order: ${e.toString()}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1134,174 +1123,4 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _showBatchDetails(BuildContext buildContext, List<Order> batchOrders) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.list_alt, color: Colors.white, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Order Batch Details (${batchOrders.length} items)',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 300,
-                  child: ListView.builder(
-                    itemCount: batchOrders.length,
-                    itemBuilder: (context, index) {
-                      final order = batchOrders[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        color: isDarkMode ? Colors.grey[800] : Colors.white,
-                        shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.2),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: const Color(
-                                      0xFF0651A4,
-                                    ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF0651A4),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Item ${index + 1}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                                          ),
-                                        ),
-                                        Text(
-                                          'Brand: ${order.brand}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Item ID: ${order.itemId}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    child: Text(
-                                      'Qty: ${order.quantity}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 4,
-                      shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

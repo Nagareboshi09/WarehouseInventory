@@ -16,10 +16,16 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:warehouse_inventory/utils/user_helper.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
+  const InventoryScreen({
+    super.key, 
+    this.initialBranch, 
+    this.showLowStockOnly = false,
+    this.editBatchOrders,
+  });
 
   final Branch? initialBranch;
   final bool showLowStockOnly;
+  final List<Order>? editBatchOrders;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -36,11 +42,35 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _isExporting = false; // Prevent multiple concurrent exports
   String _searchQuery = '';
   String _branchSearchQuery = '';
+  
+  // Order editing variables
+  bool _isEditMode = false;
+  List<Order> _editBatchOrders = [];
+  Map<int, TextEditingController> _orderQuantityControllers = {};
+  Map<int, int> _orderQuantities = {};
+  String _orderLocation = '';
 
   @override
   void initState() {
     super.initState();
     _initializeLogger();
+    
+    // Check if we're in edit mode
+    if (widget.editBatchOrders != null && widget.editBatchOrders!.isNotEmpty) {
+      _isEditMode = true;
+      _editBatchOrders = widget.editBatchOrders!;
+      
+      // Set the branch from the first order
+      final firstOrder = _editBatchOrders.first;
+      _orderLocation = firstOrder.location;
+      
+      // Initialize order quantity controllers
+      for (final order in _editBatchOrders) {
+        _orderQuantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
+        _orderQuantities[order.itemId] = order.quantity;
+      }
+    }
+    
     _loadBranches();
   }
 

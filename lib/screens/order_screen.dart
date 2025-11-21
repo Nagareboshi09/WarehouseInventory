@@ -5,11 +5,12 @@ import 'package:drift/drift.dart' as drift;
 // Using Drift-generated classes instead of old model classes
 import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_list_screen.dart';
+import 'package:warehouse_inventory/screens/inventory_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-   final List<Order>? editBatch;
+   final Order? editOrder;
 
-   const OrderScreen({super.key, this.editBatch});
+    const OrderScreen({super.key, this.editOrder});
 
    @override
    State<OrderScreen> createState() => _OrderScreenState();
@@ -32,7 +33,7 @@ class _OrderScreenState extends State<OrderScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.editBatch != null) {
+    if (widget.editOrder != null) {
       _loadEditData();
     } else {
       _loadData();
@@ -61,9 +62,9 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Future<void> _loadEditData() async {
-    if (widget.editBatch == null || widget.editBatch!.isEmpty) return;
+    if (widget.editOrder == null) return;
 
-    final firstOrder = widget.editBatch!.first;
+    final order = widget.editOrder!;
 
     // Wait for branches to be loaded if not already loaded
     if (_branches.isEmpty) {
@@ -72,24 +73,23 @@ class _OrderScreenState extends State<OrderScreen> {
 
     // Find the branch for this order
     final branch = _branches.firstWhere(
-      (b) => b.id == firstOrder.branchId,
-      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
+      (b) => b.id == order.branchId,
+      orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: ''),
     );
 
     setState(() {
       _selectedBranch = branch;
-      _locationController.text = firstOrder.location;
+      _locationController.text = order.location;
     });
 
     // Load master items for the branch
     await _loadMasterItems();
 
-    // Filter to only show items that are in the edit batch
-    final editBatchItemIds = widget.editBatch!.map((order) => order.itemId).toSet();
+    // Filter to only show the item being edited
     setState(() {
-      _filteredItems = _masterItems.where((item) => editBatchItemIds.contains(item.id)).toList();
-      
-      // Initialize controllers only for items in the edit batch
+      _filteredItems = _masterItems.where((item) => item.id == order.itemId).toList();
+
+      // Initialize controllers only for the edited item
       _quantityControllers.clear();
       _orderQuantities.clear();
       for (var item in _filteredItems) {
@@ -98,13 +98,9 @@ class _OrderScreenState extends State<OrderScreen> {
       }
     });
 
-    // Pre-fill quantities from the edit batch
-    for (final order in widget.editBatch!) {
-      if (_orderQuantities.containsKey(order.itemId)) {
-        _quantityControllers[order.itemId]?.text = order.quantity.toString();
-        _orderQuantities[order.itemId] = order.quantity;
-      }
-    }
+    // Pre-fill quantity from the order
+    _quantityControllers[order.itemId]?.text = order.quantity.toString();
+    _orderQuantities[order.itemId] = order.quantity;
   }
 
   Future<void> _loadMasterItems() async {
@@ -185,45 +181,50 @@ class _OrderScreenState extends State<OrderScreen> {
     });
 
     try {
-      // If editing, delete existing orders first
-      if (widget.editBatch != null) {
-        for (final order in widget.editBatch!) {
-          await AppDatabase.instance.deleteOrder(order.id);
+      String? batchId;
+      List<OrdersCompanion>? orderCompanions;
+      String? savedLocation;
+
+      if (widget.editOrder != null) {
+        // If editing, update the existing order
+        final updatedOrder = widget.editOrder!.copyWith(
+          branchId: _selectedBranch?.id ?? widget.editOrder!.branchId,
+          location: _locationController.text.trim(),
+          quantity: _orderQuantities[widget.editOrder!.itemId] ?? widget.editOrder!.quantity,
+          dateOrdered: DateTime.now().toIso8601String(),
+        );
+        await AppDatabase.instance.updateOrder(updatedOrder);
+      } else {
+        // Generate a unique batch ID for this order session
+        batchId = DateTime.now().millisecondsSinceEpoch.toString();
+
+        // Preserve the location value before form reset
+        savedLocation = _locationController.text.trim();
+
+        // Create orders for each item with quantity > 0
+        orderCompanions = [];
+        // Use all master items for new orders
+        for (var item in _masterItems) {
+          int quantity = _orderQuantities[item.id ?? 0] ?? 0;
+          if (quantity > 0) {
+            final orderCompanion = OrdersCompanion.insert(
+              branchId: _selectedBranch?.id ?? 0,
+              location: _locationController.text.trim(),
+              brand: item.brand ?? '',
+              itemId: item.id ?? 0,
+              quantity: quantity,
+              dateOrdered: DateTime.now().toIso8601String(),
+              status: const drift.Value('pending'),
+              batchId: drift.Value(batchId),
+            );
+            orderCompanions.add(orderCompanion);
+          }
         }
-      }
 
-      // Generate a unique batch ID for this order session (or use existing if editing)
-      final batchId = widget.editBatch != null
-          ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
-          : DateTime.now().millisecondsSinceEpoch.toString();
-
-      // Preserve the location value before form reset
-      final savedLocation = _locationController.text.trim();
-
-      // Create orders for each item with quantity > 0
-      List<OrdersCompanion> orderCompanions = [];
-      // Use filtered items if editing, otherwise use all master items
-      final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
-      for (var item in itemsToProcess) {
-        int quantity = _orderQuantities[item.id ?? 0] ?? 0;
-        if (quantity > 0) {
-          final orderCompanion = OrdersCompanion.insert(
-            branchId: _selectedBranch?.id ?? 0,
-            location: _locationController.text.trim(),
-            brand: item.brand ?? '',
-            itemId: item.id ?? 0,
-            quantity: quantity,
-            dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
-            status: const drift.Value('pending'),
-            batchId: drift.Value(batchId),
-          );
-          orderCompanions.add(orderCompanion);
+        // Add orders to database (only for new orders)
+        for (var orderCompanion in orderCompanions) {
+          await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
         }
-      }
-
-      // Add orders to database
-      for (var orderCompanion in orderCompanions) {
-        await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
       }
 
       // Simulate order submission
@@ -259,13 +260,13 @@ class _OrderScreenState extends State<OrderScreen> {
                 ],
               ),
               content: Text(
-                widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
+                widget.editOrder != null ? 'Order updated successfully!' : '${orderCompanions?.length ?? 0} order(s) submitted successfully!',
                 style: TextStyle(
                   color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
                   fontSize: 16,
                 ),
               ),
-              actions: widget.editBatch != null
+              actions: widget.editOrder != null
                   ? [
                       // Cancel button for edit mode
                       ElevatedButton(
@@ -288,13 +289,13 @@ class _OrderScreenState extends State<OrderScreen> {
                           ),
                         ),
                       ),
-                      // View Orders button for edit mode - directs to order list screen
+                      // View Inventory button for edit mode - directs to inventory screen
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop(); // Close dialog
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
-                              builder: (_) => OrderListScreen(),
+                              builder: (_) => InventoryScreen(initialBranch: _selectedBranch),
                             ),
                           );
                         },
@@ -307,7 +308,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
                         child: Text(
-                          'View Orders',
+                          'View Inventory',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -321,7 +322,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop(); // Close dialog
-                          
+
                           // Reset form for new orders
                           _formKey.currentState!.reset();
                           // Don't clear location - keep it for continuity
@@ -340,7 +341,9 @@ class _OrderScreenState extends State<OrderScreen> {
                             _inventoryStock.clear();
                             _itemSales.clear();
                             // Restore the location field with the saved value
-                            _locationController.text = savedLocation;
+                            if (savedLocation != null) {
+                              _locationController.text = savedLocation;
+                            }
                           });
                         },
                         style: ElevatedButton.styleFrom(
@@ -363,7 +366,7 @@ class _OrderScreenState extends State<OrderScreen> {
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop(); // Close dialog
-                          
+
                           // Navigate to order list screen with the submitted batch ID
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
@@ -393,7 +396,7 @@ class _OrderScreenState extends State<OrderScreen> {
         );
 
         // Reset form for new orders (only for create mode)
-        if (widget.editBatch == null) {
+        if (widget.editOrder == null) {
           _formKey.currentState!.reset();
           // Don't clear location - keep it for continuity
           // Clear quantities
@@ -411,7 +414,9 @@ class _OrderScreenState extends State<OrderScreen> {
             _inventoryStock.clear();
             _itemSales.clear();
             // Restore the location field with the saved value
-            _locationController.text = savedLocation;
+            if (savedLocation != null) {
+              _locationController.text = savedLocation;
+            }
           });
         }
       }
@@ -419,7 +424,7 @@ class _OrderScreenState extends State<OrderScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error ${widget.editBatch != null ? 'updating' : 'saving'} orders: ${e.toString()}'),
+            content: Text('Error ${widget.editOrder != null ? 'updating' : 'saving'} orders: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -534,7 +539,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            widget.editBatch != null ? 'Edit Order' : 'Create Order',
+                            widget.editOrder != null ? 'Edit Order' : 'Create Order',
                             style: TextStyle(
                               fontSize: 28.0,
                               fontWeight: FontWeight.bold,
@@ -702,7 +707,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     if (_selectedBranch != null &&
                                         _masterItems.isNotEmpty) ...[
                                       Text(
-                                        widget.editBatch != null
+                                        widget.editOrder != null
                                             ? 'Ordered Items (${_filteredItems.length})'
                                             : 'Select Items to Order',
                                         style: TextStyle(
@@ -711,7 +716,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
-                                      if (widget.editBatch == null) ...[
+                                      if (widget.editOrder == null) ...[
                                         Container(
                                           decoration: BoxDecoration(
                                             color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
@@ -957,7 +962,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                _isLoading ? 'Submitting...' : (widget.editBatch != null ? 'Update Order' : 'Submit Order'),
+                                _isLoading ? 'Submitting...' : (widget.editOrder != null ? 'Update Order' : 'Submit Order'),
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

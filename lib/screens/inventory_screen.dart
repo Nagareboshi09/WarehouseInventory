@@ -1215,13 +1215,36 @@ Future<void> _loadInventoryItems() async {
                                   );
                                   try {
                                     await AppDatabase.instance.into(AppDatabase.instance.orders).insert(order);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Order submitted successfully')),
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text('Order Submitted'),
+                                          content: Text('Your order has been submitted successfully.'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(context).pop(),
+                                              child: Text('OK'),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
-                                    Navigator.of(context).pop();
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error submitting order: $e')),
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text('Error'),
+                                          content: Text('Error submitting order: $e'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(context).pop(),
+                                              child: Text('OK'),
+                                            ),
+                                          ],
+                                        );
+                                      },
                                     );
                                   }
                                 }

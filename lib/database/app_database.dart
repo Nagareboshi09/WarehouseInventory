@@ -313,6 +313,17 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  // Delete user by ID
+  Future<bool> deleteUser(int userId) async {
+    try {
+      final deletedRows = await (delete(users)..where((u) => u.id.equals(userId))).go();
+      return deletedRows > 0;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return false;
+    }
+  }
+
   // Branch methods
   Future<List<Branch>> getAllBranches() async {
     final result = await select(branches).get();

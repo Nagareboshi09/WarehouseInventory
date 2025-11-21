@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
-import 'package:warehouse_inventory/screens/order_screen.dart';
+import 'package:warehouse_inventory/screens/account_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
   final String? initialBatchId;
@@ -88,7 +88,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const OrderScreen(),
+                  builder: (_) => const AccountScreen(),
                 ),
               ).then((_) {
                 // Refresh orders after returning from order screen
@@ -773,7 +773,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
     // Navigate to order screen with pre-filled data for editing
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OrderScreen(editBatch: batchOrders),
+        builder: (_) => AccountScreen(editUser: null),
       ),
     ).then((_) {
       // Refresh orders after returning from edit screen

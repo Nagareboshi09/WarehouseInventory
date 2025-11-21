@@ -4,6 +4,12 @@ import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_screen.dart';
+import 'package:warehouse_inventory/utils/user_helper.dart';
+import 'package:excel/excel.dart' as excel_package;
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
 
 class OrderListScreen extends StatefulWidget {
   final String? initialBatchId;
@@ -27,16 +33,20 @@ class _OrderListScreenState extends State<OrderListScreen> {
     _filterBatchId = widget.initialBatchId;
     // Refresh orders when screen is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<OrderProvider>().loadOrders();
-      _loadBranches();
+      if (mounted) {
+        context.read<OrderProvider>().loadOrders();
+        _loadBranches();
+      }
     });
   }
 
   Future<void> _loadBranches() async {
     final branches = await AppDatabase.instance.getAllBranches();
-    setState(() {
-      _branches = branches..sort((a, b) => a.id.compareTo(b.id));
-    });
+    if (mounted) {
+      setState(() {
+        _branches = branches..sort((a, b) => a.id.compareTo(b.id));
+      });
+    }
   }
 
   @override
@@ -84,7 +94,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           );
 
         return Scaffold(
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: batchList.isEmpty ? FloatingActionButton(
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -93,7 +103,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               ).then((_) {
                 // Refresh orders after returning from order screen
                 if (mounted) {
-                  context.read<OrderProvider>().loadOrders();
+                  Provider.of<OrderProvider>(context, listen: false).loadOrders();
                 }
               });
             },
@@ -102,6 +112,42 @@ class _OrderListScreenState extends State<OrderListScreen> {
             elevation: 6,
             tooltip: 'Go to Order Screen',
             child: const Icon(Icons.shopping_cart),
+          ) : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Download XLSX Floating Action Button
+              FloatingActionButton(
+                onPressed: () => _downloadBatchListAsXLSX(context, orders, _branches),
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                tooltip: 'Send Batch List as XLSX',
+                heroTag: "download_xlsx",
+                child: const Icon(Icons.send),
+              ),
+              const SizedBox(width: 16),
+              // Add Order Floating Action Button
+              FloatingActionButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const OrderScreen(),
+                    ),
+                  ).then((_) {
+                    // Refresh orders after returning from order screen
+                    if (mounted) {
+                      context.read<OrderProvider>().loadOrders();
+                    }
+                  });
+                },
+                backgroundColor: const Color(0xFF0651A4),
+                foregroundColor: Colors.white,
+                elevation: 6,
+                tooltip: 'Go to Order Screen',
+                heroTag: "add_order",
+                child: const Icon(Icons.shopping_cart),
+              ),
+            ],
           ),
           body: Container(
             decoration: BoxDecoration(
@@ -535,7 +581,242 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _showFilterDialog(BuildContext context, List<int> branchIds, List<String> products, List<Order> allOrders) {
+  Future<void> _downloadBatchListAsXLSX(BuildContext buildContext, List<Order> orders, List<Branch> branches) async {
+    if (orders.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(buildContext).showSnackBar(
+          const SnackBar(
+            content: Text('No orders to export'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Show loading indicator
+      if (mounted) {
+        showDialog(
+          context: buildContext,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) {
+            if (!mounted) {
+              return const SizedBox.shrink();
+            }
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+      }
+
+      // Create Excel workbook
+      final excel = excel_package.Excel.createExcel();
+      
+      // Get the default sheet or create if doesn't exist
+      var sheetObject = excel['Sheet1'];
+      
+      // Add headers - SKU and Description as first two columns
+      sheetObject.appendRow([
+        'SKU',
+        'Description',
+        'Date Ordered',
+        'Branch Code',
+        'Location',
+        'Brand',
+        'Quantity',
+        'Status'
+      ]);
+
+      // Group orders by batch ID for summary
+      final orderBatches = <String, List<Order>>{};
+      for (final order in orders) {
+        final batchId = order.batchId ?? 'single_${order.id}';
+        if (!orderBatches.containsKey(batchId)) {
+          orderBatches[batchId] = [];
+        }
+        orderBatches[batchId]!.add(order);
+      }
+
+      // Get all master items and inventory items to look up SKU and Description
+      final masterItems = await AppDatabase.instance.getAllMasterItems();
+      final inventoryItems = await AppDatabase.instance.getAllInventoryItems();
+
+      // Combine both lists for easier lookup
+      final allItems = <int, Map<String, String>>{};
+      
+      // Add master items
+      for (final item in masterItems) {
+        allItems[item.id] = {
+          'sku': item.sku,
+          'description': item.description,
+        };
+      }
+      
+      // Add inventory items (will override if same ID exists in master)
+      for (final item in inventoryItems) {
+        allItems[item.id] = {
+          'sku': item.sku,
+          'description': item.description,
+        };
+      }
+
+      // Add order data (SKU, Description, and all order information)
+      for (final order in orders) {
+        final branchCode = branches.firstWhere(
+          (b) => b.id == order.branchId,
+          orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: '', code: 'N/A'),
+        ).code ?? 'N/A';
+
+        // Parse date for better formatting
+        DateTime? orderDate;
+        try {
+          orderDate = DateTime.parse(order.dateOrdered);
+        } catch (e) {
+          orderDate = null;
+        }
+
+        // Get SKU and Description for this order item
+        final itemDetails = allItems[order.itemId];
+        final sku = itemDetails?['sku'] ?? 'Unknown SKU';
+        final description = itemDetails?['description'] ?? 'Unknown Description';
+
+        sheetObject.appendRow([
+          sku,
+          description,
+          orderDate != null 
+              ? DateFormat('yyyy-MM-dd HH:mm').format(orderDate) 
+              : order.dateOrdered,
+          branchCode,
+          order.location,
+          order.brand,
+          order.quantity.toString(),
+          order.status,
+        ]);
+      }
+
+      // Add user information section at the very end
+      final currentUser = await UserHelper.getCurrentUser();
+      final username = currentUser?['username'] ?? 'Unknown User';
+      final role = currentUser?['role'] ?? 'user';
+      final exportTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      
+      // Add empty row for separation before user info
+      sheetObject.appendRow(['', '', '', '', '', '', '', '']);
+      
+      // Add user information as separate rows (after all order data)
+      sheetObject.appendRow(['Exported By: $username', '', '', '', '', '', '', '']);
+      sheetObject.appendRow(['Role: $role', '', '', '', '', '', '', '']);
+      sheetObject.appendRow(['Export Time: $exportTime', '', '', '', '', '', '', '']);
+
+      // Add a summary sheet
+      var summarySheet = excel['Summary'];
+      
+      // Add summary headers
+      summarySheet.appendRow([
+        'Batch ID',
+        'Order Count',
+        'Total Quantity',
+        'Date Ordered',
+        'Branch Code',
+        'Location'
+      ]);
+
+      // Add batch summary data
+      final batchList = orderBatches.entries.toList()
+        ..sort((a, b) => b.value.first.dateOrdered.compareTo(a.value.first.dateOrdered));
+
+      for (final batchEntry in batchList) {
+        final batchOrders = batchEntry.value;
+        final firstOrder = batchOrders.first;
+        final totalItems = batchOrders.length;
+        final totalQuantity = batchOrders.fold(0, (sum, order) => sum + order.quantity);
+        
+        final branchCode = branches.firstWhere(
+          (b) => b.id == firstOrder.branchId,
+          orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: '', code: 'N/A'),
+        ).code ?? 'N/A';
+
+        // Parse date for better formatting
+        DateTime? orderDate;
+        try {
+          orderDate = DateTime.parse(firstOrder.dateOrdered);
+        } catch (e) {
+          orderDate = null;
+        }
+
+        summarySheet.appendRow([
+          batchEntry.key,
+          totalItems.toString(),
+          totalQuantity.toString(),
+          orderDate != null 
+              ? DateFormat('yyyy-MM-dd HH:mm').format(orderDate) 
+              : firstOrder.dateOrdered,
+          branchCode,
+          firstOrder.location,
+        ]);
+      }
+
+      // Generate filename with timestamp
+      final now = DateTime.now();
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(now);
+      final filename = 'batch_list_$timestamp.xlsx';
+
+      // Save the file
+      final bytes = excel.encode();
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/$filename');
+      await file.writeAsBytes(bytes!);
+
+      // Close loading indicator
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Share the file using Share Plus
+      final xFile = XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      await Share.shareXFiles(
+        [xFile],
+        subject: 'Order Batch List - $timestamp',
+        text: 'Please find attached the order batch list generated on ${DateFormat('yyyy-MM-dd HH:mm').format(now)}',
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(buildContext).showSnackBar(
+          const SnackBar(
+            content: Text('Batch list are sent successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // Clean up temporary file after sharing (optional)
+      // Uncomment if you want to delete the file after sharing
+      /*
+      Future.delayed(const Duration(seconds: 5), () {
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
+      });
+      */
+
+    } catch (e) {
+      // Close loading indicator if still open
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating XLSX file: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showFilterDialog(BuildContext buildContext, List<int> branchIds, List<String> products, List<Order> allOrders) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     // Local variables for dialog state
     String? localSelectedBranch = _selectedBranch;
@@ -777,7 +1058,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
       ),
     ).then((_) {
       // Refresh orders after returning from edit screen
-      context.read<OrderProvider>().loadOrders();
+      if (mounted) {
+        context.read<OrderProvider>().loadOrders();
+      }
     });
   }
 
@@ -849,7 +1132,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _showBatchDetails(BuildContext context, List<Order> batchOrders) {
+  void _showBatchDetails(BuildContext buildContext, List<Order> batchOrders) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,

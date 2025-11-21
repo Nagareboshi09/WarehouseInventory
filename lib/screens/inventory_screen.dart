@@ -189,6 +189,113 @@ Future<void> _loadInventoryItems() async {
     });
   }
 
+  Widget _buildInfoRow(String label, String value) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRowWithDate(String label, String value, String? date) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                if (date != null) Text(
+                  DateFormat('MMM dd, yyyy').format(DateTime.parse(date)),
+                  style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputRow(String label, TextEditingController controller, Function(String) onChanged) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputRowWithDate(String label, TextEditingController controller, DateTime date, Function(String) onChanged) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('Date: ${DateFormat('MMM dd, yyyy').format(date)}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14)),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 // Test method to debug the export process
   void _testInventoryData() {
     if (_selectedBranch == null) {
@@ -957,165 +1064,161 @@ Future<void> _loadInventoryItems() async {
                             Expanded(child: Padding(padding: EdgeInsets.only(left: 10), child: Text(formatDouble(proposedOrd), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16)))),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        // actual order
+                        const SizedBox(height: 24),
                         Row(
                           children: [
-                            Expanded(child: Text('actual order:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18))),
                             Expanded(
-                              child: TextField(
-                                controller: actualOrderController,
-                                keyboardType: TextInputType.number,
-                                onChanged: (value) {
-                                  final orderQty = int.tryParse(value) ?? 0;
-                                  setDialogState(() {
-                                    showSubmitButton = orderQty > 0;
-                                  });
+                              child: TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  // Update logic
+                                  final newPrev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
+                                  final newEnd = int.tryParse(actualCountController.text) ?? item.end;
+                                  final newSales = calculatedSales;
+                                  // Update the item
+                                  final updatedItem = InventoryItem(
+                                    id: item.id,
+                                    sku: item.sku,
+                                    description: item.description,
+                                    end: newEnd,
+                                    location: item.location,
+                                    brand: item.brand,
+                                    dateAdded: item.dateAdded,
+                                    lastUpdated: DateTime.now().toIso8601String(),
+                                    branchId: item.branchId,
+                                    beg: item.beg, // keep
+                                    prev: newPrev == 0 ? null : newPrev,
+                                    sales: newSales == 0 ? null : newSales,
+                                  );
+                                  try {
+                                    await AppDatabase.instance.updateInventoryItem(updatedItem);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Updated successfully')),
+                                    );
+                                    Navigator.of(context).pop();
+                                    _loadInventoryItems();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error updating: $e')),
+                                    );
+                                  }
                                 },
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  elevation: 4,
+                                  shadowColor: const Color(
+                                    0xFF0651A4,
+                                  ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
+                                ),
+                                child: const Text(
+                                  'Update',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Actual Order Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Actual Order', style: TextStyle(color: isDarkMode ? Colors.white : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 20)),
+                        const SizedBox(height: 12),
+                        _buildInputRow('actual order:', actualOrderController, (value) {
+                          final orderQty = int.tryParse(value) ?? 0;
+                          setDialogState(() {
+                            showSubmitButton = orderQty > 0;
+                          });
+                        }),
                         if (showSubmitButton) Padding(
                           padding: EdgeInsets.only(top: 16),
-                          child: Row(
-                            children: [
-                              Expanded(child: SizedBox()),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    final orderQty = int.tryParse(actualOrderController.text) ?? 0;
-                                    if (orderQty > 0) {
-                                      final order = OrdersCompanion.insert(
-                                        branchId: _selectedBranch!.id,
-                                        location: item.location,
-                                        brand: item.brand ?? '',
-                                        itemId: item.id,
-                                        quantity: orderQty,
-                                        dateOrdered: DateTime.now().toIso8601String(),
-                                        status: drift.Value('pending'),
-                                        batchId: const drift.Value.absent(),
-                                      );
-                                      try {
-                                        await AppDatabase.instance.into(AppDatabase.instance.orders).insert(order);
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Order submitted successfully')),
-                                        );
-                                        Navigator.of(context).pop();
-                                      } catch (e) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Error submitting order: $e')),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    elevation: 4,
-                                  ),
-                                  child: const Text(
-                                    'Submit',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final orderQty = int.tryParse(actualOrderController.text) ?? 0;
+                                if (orderQty > 0) {
+                                  final order = OrdersCompanion.insert(
+                                    branchId: _selectedBranch!.id,
+                                    location: item.location,
+                                    brand: item.brand ?? '',
+                                    itemId: item.id,
+                                    quantity: orderQty,
+                                    dateOrdered: DateTime.now().toIso8601String(),
+                                    status: drift.Value('pending'),
+                                    batchId: const drift.Value.absent(),
+                                  );
+                                  try {
+                                    await AppDatabase.instance.into(AppDatabase.instance.orders).insert(order);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Order submitted successfully')),
+                                    );
+                                    Navigator.of(context).pop();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error submitting order: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                elevation: 4,
+                              ),
+                              child: const Text(
+                                'Submit Order',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            // Update logic
-                            final newPrev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
-                            final newEnd = int.tryParse(actualCountController.text) ?? item.end;
-                            final newSales = calculatedSales;
-                            // Update the item
-                            final updatedItem = InventoryItem(
-                              id: item.id,
-                              sku: item.sku,
-                              description: item.description,
-                              end: newEnd,
-                              location: item.location,
-                              brand: item.brand,
-                              dateAdded: item.dateAdded,
-                              lastUpdated: DateTime.now().toIso8601String(),
-                              branchId: item.branchId,
-                              beg: item.beg, // keep
-                              prev: newPrev == 0 ? null : newPrev,
-                              sales: newSales == 0 ? null : newSales,
-                            );
-                            try {
-                              await AppDatabase.instance.updateInventoryItem(updatedItem);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Updated successfully')),
-                              );
-                              Navigator.of(context).pop();
-                              _loadInventoryItems();
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error updating: $e')),
-                              );
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 4,
-                            shadowColor: const Color(
-                              0xFF0651A4,
-                            ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
-                          ),
-                          child: const Text(
-                            'Update',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

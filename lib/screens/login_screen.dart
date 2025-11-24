@@ -22,6 +22,13 @@ class _LoginScreenState extends State<LoginScreen>
   late Animation<double> _scaleAnimation;
   int _hiddenButtonClickCount = 0;
   bool _isDarkMode = false;
+  
+  // Flexible text messages for hidden button progressive feedback
+  final List<String> _hiddenButtonMessages = [
+    '...',
+    '.....',
+    '.......',
+  ];
 
   @override
   void initState() {
@@ -106,26 +113,13 @@ class _LoginScreenState extends State<LoginScreen>
       _hiddenButtonClickCount = 0; // Reset counter
     }
     
-    // Show progressive visual feedback
-    if (_hiddenButtonClickCount == 1) {
+    // Show progressive visual feedback using flexible messages
+    if (_hiddenButtonClickCount > 0 && _hiddenButtonClickCount <= _hiddenButtonMessages.length) {
+      final messageIndex = _hiddenButtonClickCount - 1;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('...'),
-          duration: Duration(milliseconds: 500),
-        ),
-      );
-    } else if (_hiddenButtonClickCount == 2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('.....'),
-          duration: Duration(milliseconds: 500),
-        ),
-      );
-    } else if (_hiddenButtonClickCount == 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('.......'),
-          duration: Duration(milliseconds: 500),
+        SnackBar(
+          content: Text(_hiddenButtonMessages[messageIndex]),
+          duration: const Duration(milliseconds: 500),
         ),
       );
     }

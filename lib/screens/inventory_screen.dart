@@ -1317,6 +1317,126 @@ Future<void> _loadInventoryItems() async {
                                   final newPrev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
                                   final newActualCount = int.tryParse(actualCountController.text) ?? (item.sales ?? item.end);
                                   final newSales = calculatedSales;
+                                  
+                                  // Validate that calculated values are not negative
+                                  if (calculatedSales < 0 || weeklySales < 0 || reorderPt < 0 || maintInvty < 0) {
+                                    if (mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return AlertDialog(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+                                            title: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.warning,
+                                                  color: Colors.red,
+                                                  size: 28,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    'Invalid Values',
+                                                    style: TextStyle(
+                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            content: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'The update would result in negative calculated values. Please adjust your inputs.',
+                                                  style: TextStyle(
+                                                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red.withValues(alpha: isDarkMode ? 0.2 : 0.1),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: Colors.red.withValues(alpha: isDarkMode ? 0.3 : 0.2)),
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Negative values detected:',
+                                                        style: TextStyle(
+                                                          color: Colors.red,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                      if (calculatedSales < 0)
+                                                        Text(
+                                                          '• Sales: $calculatedSales (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (weeklySales < 0)
+                                                        Text(
+                                                          '• Weekly Sales: ${formatDouble(weeklySales)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (reorderPt < 0)
+                                                        Text(
+                                                          '• Reorder Point: ${formatDouble(reorderPt)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (maintInvty < 0)
+                                                        Text(
+                                                          '• Maintenance Inventory: ${formatDouble(maintInvty)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(context).pop(),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                                                ),
+                                                child: Text(
+                                                  'OK',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  
                                   // Update the item - keep end as imported count, store actual count in sales field
                                   final updatedItem = InventoryItem(
                                     id: item.id,

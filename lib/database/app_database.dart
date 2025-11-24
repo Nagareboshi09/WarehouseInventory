@@ -487,6 +487,11 @@ class AppDatabase extends _$AppDatabase {
     return result;
   }
 
+  Future<List<Order>> getOrdersByItem(int itemId) async {
+    final result = await (select(orders)..where((o) => o.itemId.equals(itemId))).get();
+    return result;
+  }
+
   Future<int> insertOrder(Order order) async {
     return await into(orders).insert(
       order.toCompanion(false),

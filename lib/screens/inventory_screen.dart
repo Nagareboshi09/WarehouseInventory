@@ -370,17 +370,12 @@ Future<void> _loadInventoryItems() async {
       return;
     }
      
-    if (_inventoryItems.isEmpty) {
-      _logger.warning('❌ No inventory items found for branch: ${_selectedBranch!.name}');
-      _logger.fine('Branch ID: ${_selectedBranch!.id}');
-      return;
-    }
+
      
-    _logger.info('✅ Data verification:');
+    _logger.info('✅ Data verification for export:');
     _logger.fine('Branch: ${_selectedBranch!.name}');
-    _logger.fine('Total items: ${_inventoryItems.length}');
-    _logger.fine('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
-    _logger.fine('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
+    _logger.fine('Branch ID: ${_selectedBranch!.id}');
+    _logger.fine('Will fetch fresh data directly from database for export');
   }
 
   Future<void> _exportInventoryToFile() async {
@@ -397,11 +392,11 @@ Future<void> _loadInventoryItems() async {
       return;
     }
 
-    if (_selectedBranch == null || _inventoryItems.isEmpty) {
+    if (_selectedBranch == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No inventory data to export'),
+            content: Text('No branch selected'),
             backgroundColor: Colors.red,
           ),
         );
@@ -435,8 +430,15 @@ Future<void> _loadInventoryItems() async {
       final String branchCode = _selectedBranch!.code ?? _selectedBranch!.id.toString(); // Use branch code from master data, fallback to ID
       final String fileName = '${branchCode}_${branchName}_${currentDate}.xlsx';
       
-      // Run the export operation
-      final exportResult = await _performExportInBackground(_inventoryItems, fileName);
+      // Fetch fresh inventory data directly from database to ensure we have the latest updates
+      final freshInventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
+        _selectedBranch!.id,
+      );
+      
+      _logger.info('📤 Exporting ${freshInventoryItems.length} items with fresh database data');
+      
+      // Run the export operation with fresh data
+      final exportResult = await _performExportInBackground(freshInventoryItems, fileName);
       
       if (exportResult['success'] == true) {
         final String filePath = exportResult['path'];
@@ -447,10 +449,11 @@ Future<void> _loadInventoryItems() async {
         _logger.fine('File saved at: $filePath');
         _logger.fine('File exists: ${await file.exists()}');
         _logger.fine('File size: ${await file.length()} bytes');
+        _logger.fine('Items exported: ${freshInventoryItems.length}');
         
         if (mounted) {
-          // Show options to user
-          _showExportOptions(file, fileName);
+          // Show options to user with correct item count
+          _showExportOptions(file, fileName, freshInventoryItems.length);
         }
       } else {
         throw Exception(exportResult['error'] ?? 'Unknown export error');
@@ -484,7 +487,7 @@ Future<void> _loadInventoryItems() async {
   }
 
   // Show export options dialog
-  void _showExportOptions(File file, String fileName) {
+  void _showExportOptions(File file, String fileName, int itemCount) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     showDialog(
@@ -536,7 +539,7 @@ Future<void> _loadInventoryItems() async {
               ),
               const SizedBox(height: 8),
               Text(
-                'Items exported: ${_inventoryItems.length}',
+                'Items exported: $itemCount',
                 style: TextStyle(
                   color: isDarkMode ? Colors.white70 : Colors.black87,
                   fontSize: 14,
@@ -681,26 +684,36 @@ Future<void> _loadInventoryItems() async {
       });
       
       // Add headers
-      sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
+      sheet.appendRow(['SKU', 'Description', 'Actual Count', 'Date', 'Actual Order', 'User']);
       
       // Add data rows - simplified to avoid batch processing issues
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
-        final brand = item.brand ?? 'N/A';
         final description = item.description;
-        final beg = item.beg?.toString() ?? 'N/A';
-        final prev = item.prev?.toString() ?? 'N/A';
-        final sales = item.sales?.toString() ?? 'N/A';
+        final actualCount = item.sales?.toString() ?? item.end.toString(); 
+        // item.sales stores the actual count entered by user in inventory update dialog
+        // item.end is the original imported count (fallback if no actual count was entered)
+        final formattedDate = item.dateAdded != null 
+          ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!))
+          : 'Unknown';
+        
+        // Get actual order quantity for this item
+        int actualOrderQuantity = 0;
+        try {
+          final orders = await AppDatabase.instance.getOrdersByItem(item.id);
+          actualOrderQuantity = orders.fold<int>(0, (sum, order) => sum + order.quantity);
+        } catch (e) {
+          _logger.warning('Could not fetch orders for item ${item.sku}: $e');
+          actualOrderQuantity = 0;
+        }
         
         sheet.appendRow([
           item.sku,
           description,
-          brand,
-          item.location.toString(),
-          item.end.toString(),
-          beg,
-          prev,
-          sales
+          actualCount,
+          formattedDate,
+          actualOrderQuantity.toString(),
+          username // Current user who exported the data
         ]);
         
         // Add small delay every 100 items to prevent UI blocking
@@ -1143,6 +1156,46 @@ Future<void> _loadInventoryItems() async {
                                         setDialogState(() {
                                           selectedDate = picked;
                                         });
+                                        
+                                        // Auto-save the date when picked
+                                        try {
+                                          final updatedItem = InventoryItem(
+                                            id: item.id,
+                                            sku: item.sku,
+                                            description: item.description,
+                                            end: item.end,
+                                            location: item.location,
+                                            brand: item.brand,
+                                            dateAdded: picked.toIso8601String(),
+                                            lastUpdated: DateTime.now().toIso8601String(),
+                                            branchId: item.branchId,
+                                            beg: item.beg,
+                                            prev: item.prev,
+                                            sales: item.sales,
+                                          );
+                                          
+                                          await AppDatabase.instance.updateInventoryItem(updatedItem);
+                                          
+                                          // Show success message
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Date updated successfully'),
+                                              backgroundColor: Colors.green,
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                          
+                                          // Refresh the inventory items list to reflect the change
+                                          _loadInventoryItems();
+                                          
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error updating date: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
                                       }
                                     },
                                     child: Container(
@@ -1193,9 +1246,25 @@ Future<void> _loadInventoryItems() async {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(
-                                    'Selected Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}',
-                                    style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12, fontWeight: FontWeight.w500),
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 14,
+                                          color: Colors.green,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}',
+                                            style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),

@@ -982,10 +982,10 @@ Future<void> _loadInventoryItems() async {
                                 softWrap: true,
                                 overflow: TextOverflow.visible,
                               ),
-                              if (_selectedBranch?.location != null) ...[
+                              if (_selectedBranch?.code != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  _selectedBranch!.location!,
+                                  '(${_selectedBranch!.code})',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.white70,
@@ -2207,7 +2207,7 @@ await AppDatabase.instance
                         Expanded(
                           child: Text(
                             _branchSelected
-                                ? '${_selectedBranch?.name ?? 'Unknown Branch'} (${_selectedBranch?.location ?? 'Unknown Location'})'
+                                ? '${_selectedBranch?.name ?? 'Unknown Branch'} (${_selectedBranch?.code ?? 'Unknown Code'})'
                                 : 'Warehouse Inventory',
                             style: TextStyle(
                               fontSize: 28.0,
@@ -2544,7 +2544,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
       return branch.name.toLowerCase().contains(
             _branchSearchQuery.toLowerCase(),
           ) ||
-          branch.location.toLowerCase().contains(
+          (branch.code?.toLowerCase() ?? '').contains(
             _branchSearchQuery.toLowerCase(),
           );
     }).toList();
@@ -2559,7 +2559,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
           decoration: InputDecoration(
             labelText: 'Search Branches',
             labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-            hintText: 'Search by name or location',
+            hintText: 'Search by name or code',
             prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
@@ -2602,7 +2602,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
               return ListTile(
                 leading: Icon(Icons.business, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 title: Text(
-                  '${branch.name} (${branch.location})',
+                  '${branch.name} (${branch.code ?? branch.id.toString()})',
                   style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 ),
                 onTap: () {
@@ -2645,7 +2645,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
             return DropdownMenuItem<Branch>(
               value: branch,
               child: Text(
-                '${branch.name} (${branch.location})',
+                '${branch.name} (${branch.code ?? branch.id.toString()})',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,

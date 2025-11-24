@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
-import 'package:warehouse_inventory/screens/register_screen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -224,15 +224,6 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Sign in to your account',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: isDarkMode ? Colors.white70 : Colors.grey,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
                                 const SizedBox(height: 32),
                                 TextFormField(
                                   controller: _usernameController,
@@ -346,34 +337,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                 ),
-                                const SizedBox(height: 24),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Don\'t have an account? ',
-                                      style: TextStyle(
-                                        color: isDarkMode ? Colors.white70 : Colors.grey,
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) => const RegisterScreen(),
-                                          ),
-                                        );
-                                      },
-                                      child: Text(
-                                        'Sign Up',
-                                        style: TextStyle(
-                                          color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+
                               ],
                             ),
                           ),

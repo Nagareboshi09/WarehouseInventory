@@ -108,8 +108,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? int.tryParse(branch.maintainingInventory!) ?? 10
           : 10;
       int lowStockThreshold = maintainingInventory - 1;
-      int lowStock = items.where((item) => item.end <= lowStockThreshold).length;
-      int totalInventoryQuantity = items.fold(0, (sum, item) => sum + item.end);
+      int lowStock = items.where((item) => (item.sales ?? item.end) <= lowStockThreshold).length;
+      int totalInventoryQuantity = items.fold(0, (sum, item) => sum + (item.sales ?? item.end));
       int totalOrders = orders.length;
 
       setState(() {

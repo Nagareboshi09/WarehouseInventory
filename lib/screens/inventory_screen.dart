@@ -865,6 +865,7 @@ Future<void> _loadInventoryItems() async {
     final TextEditingController prevDeliveryController = TextEditingController(text: item.prev?.toString() ?? '');
     final TextEditingController actualCountController = TextEditingController(text: item.end.toString());
     final TextEditingController actualOrderController = TextEditingController();
+    DateTime selectedDate = item.dateAdded != null ? DateTime.parse(item.dateAdded!) : DateTime.now();
     final proposedOrder = max(0.0, maintinvty - item.end.toDouble());
     int calculatedSales = (item.prev ?? 0) - item.end;
     double weeklySales = calculatedSales / weeklyOrderOfftake;
@@ -1024,7 +1025,28 @@ Future<void> _loadInventoryItems() async {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('actual count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18)),
-                                  Text('Date: ${item.dateAdded != null ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)) : 'Unknown'}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12)),
+                                  InkWell(
+                                    onTap: () async {
+                                      final DateTime? picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: selectedDate,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2101),
+                                      );
+                                      if (picked != null && picked != selectedDate) {
+                                        setDialogState(() {
+                                          selectedDate = picked;
+                                        });
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        Text('Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12)),
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.calendar_today, size: 14, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1129,7 +1151,7 @@ Future<void> _loadInventoryItems() async {
                                     end: newEnd,
                                     location: item.location,
                                     brand: item.brand,
-                                    dateAdded: item.dateAdded,
+                                    dateAdded: selectedDate.toIso8601String(),
                                     lastUpdated: DateTime.now().toIso8601String(),
                                     branchId: item.branchId,
                                     beg: item.beg, // keep

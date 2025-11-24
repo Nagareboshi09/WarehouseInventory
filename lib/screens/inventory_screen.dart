@@ -326,6 +326,43 @@ Future<void> _loadInventoryItems() async {
     );
   }
 
+  Widget _buildCalculationRow(String label, String value, bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[600]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 // Test method to debug the export process
   void _testInventoryData() {
     if (_selectedBranch == null) {
@@ -1168,47 +1205,87 @@ Future<void> _loadInventoryItems() async {
                         const SizedBox(height: 16),
                         // Calculated values section
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isDarkMode ? Colors.grey[600]!.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isDarkMode ? Colors.white24 : Color(0xFF0651A4).withValues(alpha: 0.2)),
+                            color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: isDarkMode ? Colors.white30 : Color(0xFF0651A4).withValues(alpha: 0.3)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDarkMode ? 0.1 : 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(child: Text('Sales (${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'} weeks):', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 14))),
-                                  Text(calculatedSales.toString(), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
+                              Text(
+                                '📊 Calculated Values',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildCalculationRow(
+                                'Sales (${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'} weeks):',
+                                calculatedSales.toString(),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Weekly Sales:',
+                                formatDouble(weeklySales),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Reorder Point (${_selectedBranch?.weeklyReorderPoint ?? 'N/A'} weeks):',
+                                formatDouble(reorderPt),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Maint Inventory (${_selectedBranch?.maintainingInventory ?? 'N/A'} x sales):',
+                                formatDouble(maintInvty),
+                                isDarkMode,
                               ),
                               const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(child: Text('Weekly Sales:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 14))),
-                                  Text(formatDouble(weeklySales), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(child: Text('Reorder Point (${_selectedBranch?.weeklyReorderPoint ?? 'N/A'} weeks):', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 14))),
-                                  Text(formatDouble(reorderPt), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(child: Text('Maint Inventory (${_selectedBranch?.maintainingInventory ?? 'N/A'} x sales):', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 14))),
-                                  Text(formatDouble(maintInvty), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Expanded(child: Text('Proposed Order:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 14))),
-                                  Text(formatDouble(proposedOrd), style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF1E3A5F).withValues(alpha: 0.5) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: isDarkMode ? Colors.white24 : Color(0xFF0651A4).withValues(alpha: 0.2)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.shopping_cart,
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Proposed Order:',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      formatDouble(proposedOrd),
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),

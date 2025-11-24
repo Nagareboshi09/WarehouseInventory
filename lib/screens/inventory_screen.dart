@@ -684,7 +684,7 @@ Future<void> _loadInventoryItems() async {
       });
       
       // Add headers
-      sheet.appendRow(['SKU', 'Description', 'Actual Count', 'Date', 'Actual Order', 'User']);
+      sheet.appendRow(['SKU', 'Description', 'Actual Count', 'Actual Order', 'Date', 'User']);
       
       // Add data rows - simplified to avoid batch processing issues
       for (int i = 0; i < items.length; i++) {
@@ -711,8 +711,8 @@ Future<void> _loadInventoryItems() async {
           item.sku,
           description,
           actualCount,
-          formattedDate,
           actualOrderQuantity.toString(),
+          formattedDate,
           username // Current user who exported the data
         ]);
         

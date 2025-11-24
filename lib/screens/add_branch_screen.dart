@@ -50,6 +50,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
   final List<int?> _masterItemBegQuantities = [];
   final List<int?> _masterItemPrevQuantities = [];
   final List<int?> _masterItemSalesQuantities = [];
+  final List<DateTime?> _masterItemDates = []; // Added for date tracking
   String? _codeErrorMessage;
 
   bool get _isFormValid {
@@ -191,6 +192,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       _masterItemBegQuantities.add(null); // Will be null for manually added items
       _masterItemPrevQuantities.add(null);
       _masterItemSalesQuantities.add(null);
+      _masterItemDates.add(null); // Will be null for manually added items
       _skuController.clear();
       _descriptionController.clear();
       _brandController.clear();
@@ -206,6 +208,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
       _masterItemBegQuantities.removeAt(index);
       _masterItemPrevQuantities.removeAt(index);
       _masterItemSalesQuantities.removeAt(index);
+      _masterItemDates.removeAt(index); // Remove date as well
     });
   }
 
@@ -274,6 +277,34 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         );
       },
     );
+  }
+
+  // Helper function to parse dates in MM/DATE/YEAR format
+  DateTime? parseDate(String dateStr) {
+    if (dateStr.isEmpty) return null;
+    
+    try {
+      // Handle MM/DD/YYYY format (the user mentioned MM/DATE/YEAR format)
+      final dateRegex = RegExp(r'^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$');
+      final match = dateRegex.firstMatch(dateStr.trim());
+      
+      if (match != null) {
+        final month = int.parse(match.group(1)!);
+        final day = int.parse(match.group(2)!);
+        final year = int.parse(match.group(3)!);
+        
+        // Validate month and day ranges
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          return DateTime(year, month, day);
+        }
+      }
+      
+      // Try parsing as ISO date string as fallback
+      return DateTime.parse(dateStr);
+    } catch (e) {
+      _logger.warning('Failed to parse date "$dateStr": $e');
+      return null;
+    }
   }
 
   // Optimized Excel/CSV import with progress tracking and chunked processing
@@ -429,9 +460,17 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         final prevIndex = headerMap['prev'] ?? headerMap['previous'];
         final salesIndex = headerMap['sales'] ?? headerMap['sale'];
 
+        // Detect date headers with MM/DATE/YEAR format
+        final dateIndex = headerMap['date'] ?? 
+            headerMap['dateadded'] ?? 
+            headerMap['entrydate'] ?? 
+            headerMap['recorddate'] ?? 
+            headerMap['timestamp'];
+
         // Debug: Show detected headers
         _logger.info('Detected headers: $headerMap');
         _logger.info('skuIndex: $skuIndex, descriptionIndex: $descriptionIndex, quantityIndex: $quantityIndex');
+        _logger.info('dateIndex: $dateIndex, detected from headers: ${dateIndex != null ? headerMap.entries.firstWhere((entry) => entry.value == dateIndex).key : 'none'}');
 
         if (skuIndex == null || descriptionIndex == null) {
           if (!mounted) return;
@@ -445,6 +484,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
         List<int?> importedBegQuantities = [];
         List<int?> importedPrevQuantities = [];
         List<int?> importedSalesQuantities = [];
+        List<DateTime?> importedDates = []; // Added for date tracking
 
         // Progress tracking for large datasets
         setState(() {
@@ -499,9 +539,16 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                 : '';
             final sales = salesStr.isEmpty ? null : num.tryParse(salesStr)?.round();
 
-            _logger.info('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
-            _logger.info('Row $rowIndex - Beg: $beg, Prev: $prev, Sales: $sales');
+            // Extract date field if present
+            DateTime? itemDate;
+            if (dateIndex != null && row.length > dateIndex) {
+              final dateStr = cellText(row[dateIndex]).trim();
+              itemDate = parseDate(dateStr);
+              _logger.info('Row $rowIndex - Date parsed: ${itemDate != null ? itemDate.toIso8601String() : 'null'} from "$dateStr"');
+            }
 
+            _logger.info('Row $rowIndex - SKU: "$sku", Description: "$description", Qty: $qty (from "$qtyStr")');
+            _logger.info('Row $rowIndex - Beg: $beg, Prev: $prev, Sales: $sales, Date: $itemDate');
 
             // Skip section headers like "Bronco" rows without SKU or empty description
             // Also skip rows where SKU is not a number
@@ -544,6 +591,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
             importedBegQuantities.add(beg);
             importedPrevQuantities.add(prev);
             importedSalesQuantities.add(sales);
+            importedDates.add(itemDate); // Add parsed date
           }
 
           // Yield to event loop to prevent UI freezing on low-spec devices
@@ -571,6 +619,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           _masterItemBegQuantities.addAll(importedBegQuantities);
           _masterItemPrevQuantities.addAll(importedPrevQuantities);
           _masterItemSalesQuantities.addAll(importedSalesQuantities);
+          _masterItemDates.addAll(importedDates); // Add imported dates
         });
 
         Navigator.of(context).pop(); // Close progress dialog
@@ -744,6 +793,7 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
           for (var j = i; j < endIndex; j++) {
             var item = _masterItems[j];
             var quantity = _masterItemQuantities[j];
+            var itemDate = _masterItemDates[j]; // Get the parsed date for this item
 
             // Insert into master_items
             await db.into(db.masterItems).insert(MasterItemsCompanion.insert(
@@ -754,14 +804,14 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
               branchId: branchId,
             ));
 
-            // Insert into inventory_items with additional quantity fields
+            // Insert into inventory_items with additional quantity fields and date
             await db.into(db.inventoryItems).insert(InventoryItemsCompanion.insert(
               sku: item.sku,
               description: item.description,
               end: quantity,
               location: item.location,
               brand: item.brand != null ? drift.Value(item.brand) : const drift.Value.absent(),
-              dateAdded: DateTime.now().toIso8601String(),
+              dateAdded: itemDate?.toIso8601String() ?? DateTime.now().toIso8601String(), // Use parsed date or current date
               branchId: branchId,
               beg: _masterItemBegQuantities.isNotEmpty && _masterItemBegQuantities.length > j
                   ? drift.Value(_masterItemBegQuantities[j])
@@ -1231,7 +1281,8 @@ class _AddBranchScreenState extends State<AddBranchScreen> {
                                             'End: ${_masterItemQuantities[index]}'
                                             '${_masterItemBegQuantities[index] != null ? ' | Beg: ${_masterItemBegQuantities[index]}' : ''}'
                                             '${_masterItemPrevQuantities[index] != null ? ' | Prev: ${_masterItemPrevQuantities[index]}' : ''}'
-                                            '${_masterItemSalesQuantities[index] != null ? ' | Sales: ${_masterItemSalesQuantities[index]}' : ''}',
+                                            '${_masterItemSalesQuantities[index] != null ? ' | Sales: ${_masterItemSalesQuantities[index]}' : ''}'
+                                            '${_masterItemDates[index] != null ? ' | Date: ${_masterItemDates[index]!.toIso8601String().split('T')[0]}' : ''}', // Show date if available
                                             style: const TextStyle(fontSize: 12, color: Colors.grey),
                                           ),
                                         ],

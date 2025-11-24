@@ -969,8 +969,8 @@ Future<void> _loadInventoryItems() async {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('Count (Quantity):', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18)),
-                                  if (item.lastUpdated != null) Text(
-                                    DateFormat('MMM dd, yyyy').format(DateTime.parse(item.lastUpdated!)),
+                                  if (item.dateAdded != null) Text(
+                                    DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)),
                                     style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14),
                                   ),
                                 ],
@@ -1024,7 +1024,7 @@ Future<void> _loadInventoryItems() async {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('actual count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18)),
-                                  Text('Date: ${DateFormat('MMM dd, yyyy').format(DateTime.now())}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12)),
+                                  Text('Date: ${item.dateAdded != null ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)) : 'Unknown'}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12)),
                                 ],
                               ),
                             ),
@@ -2072,7 +2072,7 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                     ),
                                                   ),
                                                   subtitle: Text(
-'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
+'SKU: ${item.sku} | Brand: ${item.brand}\nCount Date: ${item.dateAdded != null ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)) : 'Unknown'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),

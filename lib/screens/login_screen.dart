@@ -26,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen>
   // Flexible text messages for hidden button progressive feedback
   final List<String> _hiddenButtonMessages = [
     'HUY',
-    'ANO YANN',
+    'ANO YAN',
     'ALAM MO HA TALAGA TALAGA',
   ];
 

@@ -148,8 +148,15 @@ class _LoginScreenState extends State<LoginScreen>
                 Icons.admin_panel_settings,
                 color: _isDarkMode ? Colors.white : Color(0xFF0651A4),
               ),
-              SizedBox(width: _dialogTitleSpacing),
-              const Text('Create Admin Account'),
+              Expanded(
+                child: SizedBox(
+                  width: 100,
+                  child: const Text(
+                  'Create Admin Account',  
+                  softWrap: true,
+                  ),
+                ),
+              ),
             ],
           ),
           content: SingleChildScrollView(

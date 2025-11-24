@@ -85,22 +85,37 @@ class _OrderScreenState extends State<OrderScreen> {
     // Load master items for the branch
     await _loadMasterItems();
 
-    // Filter to only show the item being edited
+    // For editing, show all master items but pre-fill the quantity for the edited item
     setState(() {
-      _filteredItems = _masterItems.where((item) => item.id == order.itemId).toList();
+      _filteredItems = List.from(_masterItems); // Show all items
 
-      // Initialize controllers only for the edited item
+      // Initialize controllers for all items
       _quantityControllers.clear();
       _orderQuantities.clear();
-      for (var item in _filteredItems) {
-        _quantityControllers[item.id ?? 0] = TextEditingController();
+      for (var item in _masterItems) {
+        _quantityControllers[item.id ?? 0] = TextEditingController(text: '0');
         _orderQuantities[item.id ?? 0] = 0;
       }
     });
 
-    // Pre-fill quantity from the order
-    _quantityControllers[order.itemId]?.text = order.quantity.toString();
-    _orderQuantities[order.itemId] = order.quantity;
+    // Pre-fill quantity from the order if the item exists in current master items
+    final itemExists = _masterItems.any((item) => item.id == order.itemId);
+
+    if (itemExists) {
+      _quantityControllers[order.itemId]?.text = order.quantity.toString();
+      _orderQuantities[order.itemId] = order.quantity;
+    } else {
+      // Item not found in current master items - show warning
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Warning: The ordered item is no longer available in the current branch inventory. You can still update the order details.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadMasterItems() async {
@@ -708,7 +723,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                         _masterItems.isNotEmpty) ...[
                                       Text(
                                         widget.editOrder != null
-                                            ? 'Ordered Items (${_filteredItems.length})'
+                                            ? 'Edit Order Items'
                                             : 'Select Items to Order',
                                         style: TextStyle(
                                           fontSize: 18,
@@ -716,6 +731,32 @@ class _OrderScreenState extends State<OrderScreen> {
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
+                                      if (widget.editOrder != null) ...[
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.info, color: Colors.blue),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'You are editing an existing order. Modify quantities as needed.',
+                                                  style: TextStyle(
+                                                    color: Colors.blue.shade700,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                       if (widget.editOrder == null) ...[
                                         Container(
                                           decoration: BoxDecoration(
@@ -762,19 +803,26 @@ class _OrderScreenState extends State<OrderScreen> {
                                           itemCount: _filteredItems.length,
                                           itemBuilder: (context, index) {
                                             final item = _filteredItems[index];
+                                            final isOrderedItem = widget.editOrder != null && item.id == widget.editOrder!.itemId;
+                                            final hasQuantity = _orderQuantities[item.id ?? 0] != null && _orderQuantities[item.id ?? 0]! > 0;
+
                                             return Card(
                                               margin:
                                                   const EdgeInsets.symmetric(
                                                     horizontal: 8,
                                                     vertical: 4,
                                                   ),
-                                              elevation: 4,
+                                              elevation: isOrderedItem ? 8 : 4,
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(15),
+                                                side: isOrderedItem ? BorderSide(
+                                                  color: Colors.blue,
+                                                  width: 2,
+                                                ) : BorderSide.none,
                                               ),
                                               color: isDarkMode ? Colors.grey[800] : Colors.white,
-                                              shadowColor: const Color(
+                                              shadowColor: isOrderedItem ? Colors.blue.withValues(alpha: 0.3) : const Color(
                                                 0xFF0651A4,
                                               ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                               child: Padding(
@@ -784,6 +832,32 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
+                                                    if (isOrderedItem) ...[
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        margin: const EdgeInsets.only(bottom: 8),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.blue.withValues(alpha: 0.1),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.edit, size: 16, color: Colors.blue),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'Currently Ordered',
+                                                              style: TextStyle(
+                                                                color: Colors.blue.shade700,
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
                                                     Column(
                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                       children: [
@@ -1027,44 +1101,43 @@ class _OrderScreenState extends State<OrderScreen> {
     String? value,
     bool readOnly = false,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title with icon
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                 ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          if (readOnly && value != null) ...[
-            Text(
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Value/Input area
+        if (readOnly && value != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[700] : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
               value,
               style: TextStyle(
                 fontSize: 16,
@@ -1072,40 +1145,50 @@ class _OrderScreenState extends State<OrderScreen> {
                 color: isDarkMode ? Colors.white : Color(0xFF0651A4),
               ),
               textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
             ),
-          ] else if (controller != null) ...[
-            SizedBox(
-              height: 28,
-              child: TextField(
-                controller: controller,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                ),
-                decoration: InputDecoration(
-                  hintText: '0',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(
-                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                onChanged: onChanged,
+          ),
+        ] else if (controller != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[600] : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDarkMode ? Colors.white38 : Colors.grey.shade300,
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+              ),
+              decoration: const InputDecoration(
+                hintText: '0',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: onChanged,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }

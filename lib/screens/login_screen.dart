@@ -30,6 +30,10 @@ class _LoginScreenState extends State<LoginScreen>
     '.......',
   ];
 
+  // Flexible spacing values for hidden account creation dialog
+  final double _dialogTitleSpacing = 10.0;
+  final double _dialogFieldSpacing = 16.0;
+
   @override
   void initState() {
     super.initState();
@@ -144,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen>
                 Icons.admin_panel_settings,
                 color: _isDarkMode ? Colors.white : Color(0xFF0651A4),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: _dialogTitleSpacing),
               const Text('Create Admin Account'),
             ],
           ),
@@ -170,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen>
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: _dialogFieldSpacing),
                   TextFormField(
                     controller: adminPasswordController,
                     decoration: InputDecoration(

@@ -1019,12 +1019,15 @@ Future<void> _loadInventoryItems() async {
                         const SizedBox(height: 8),
                         // actual count
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
+                              flex: 2,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('actual count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18)),
+                                  Text('actual count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 18), softWrap: true),
+                                  const SizedBox(height: 8),
                                   InkWell(
                                     onTap: () async {
                                       final DateTime? picked = await showDatePicker(
@@ -1039,38 +1042,54 @@ Future<void> _loadInventoryItems() async {
                                         });
                                       }
                                     },
-                                    child: Row(
-                                      children: [
-                                        Text('Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12)),
-                                        const SizedBox(width: 4),
-                                        Icon(Icons.calendar_today, size: 14, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-                                      ],
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 200),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                'Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}',
+                                                style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Icon(Icons.calendar_today, size: 14, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
+                            const SizedBox(width: 16),
                             Expanded(
-                              child: Align(
-                                alignment: Alignment.topLeft,
-                                child: TextField(
-                                  controller: actualCountController,
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    final actual = int.tryParse(value) ?? item.end;
-                                    final prev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
-                                    setDialogState(() {
-                                      calculatedSales = prev - actual;
-                                      weeklySales = calculatedSales / weeklyOrderOfftake;
-                                      reorderPt = weeklySales * weeklyReorderPoint;
-                                      maintInvty = calculatedSales * maintainingInventory;
-                                      proposedOrd = max(0.0, maintInvty - actual.toDouble());
-                                    });
-                                  },
-                                  decoration: InputDecoration(
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 8),
-                                  ),
+                              flex: 3,
+                              child: TextField(
+                                controller: actualCountController,
+                                keyboardType: TextInputType.number,
+                                onChanged: (value) {
+                                  final actual = int.tryParse(value) ?? item.end;
+                                  final prev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
+                                  setDialogState(() {
+                                    calculatedSales = prev - actual;
+                                    weeklySales = calculatedSales / weeklyOrderOfftake;
+                                    reorderPt = weeklySales * weeklyReorderPoint;
+                                    maintInvty = calculatedSales * maintainingInventory;
+                                    proposedOrd = max(0.0, maintInvty - actual.toDouble());
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 ),
                               ),
                             ),

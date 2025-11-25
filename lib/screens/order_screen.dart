@@ -5,7 +5,6 @@ import 'package:drift/drift.dart' as drift;
 // Using Drift-generated classes instead of old model classes
 import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_list_screen.dart';
-import 'package:warehouse_inventory/screens/inventory_screen.dart';
 
 class OrderScreen extends StatefulWidget {
    final Order? editOrder;
@@ -85,37 +84,52 @@ class _OrderScreenState extends State<OrderScreen> {
     // Load master items for the branch
     await _loadMasterItems();
 
-    // For editing, show all master items but pre-fill the quantity for the edited item
+    // For editing, only show the specific order item
     setState(() {
-      _filteredItems = List.from(_masterItems); // Show all items
-
-      // Initialize controllers for all items
       _quantityControllers.clear();
       _orderQuantities.clear();
-      for (var item in _masterItems) {
-        _quantityControllers[item.id ?? 0] = TextEditingController(text: '0');
-        _orderQuantities[item.id ?? 0] = 0;
+      
+      try {
+        // Check if the order item exists in current master items
+        final orderItem = _masterItems.firstWhere(
+          (item) => item.id == order.itemId,
+        );
+
+        // Only show the order item
+        _filteredItems = [orderItem];
+        
+        // Initialize controller and quantity for the order item
+        _quantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
+        _orderQuantities[order.itemId] = order.quantity;
+      } catch (e) {
+        // Item not found in current master items - show warning and create a temporary item
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Warning: The ordered item is no longer available in the current branch inventory. You can still update the order details.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+
+        // Create a temporary item with order details for display
+        final tempItem = MasterItem(
+          id: order.itemId,
+          sku: 'Unknown SKU',
+          description: 'Item ID: ${order.itemId}',
+          location: order.location,
+          brand: order.brand,
+          branchId: order.branchId,
+        );
+
+        _filteredItems = [tempItem];
+        
+        // Initialize controller and quantity for the order item
+        _quantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
+        _orderQuantities[order.itemId] = order.quantity;
       }
     });
-
-    // Pre-fill quantity from the order if the item exists in current master items
-    final itemExists = _masterItems.any((item) => item.id == order.itemId);
-
-    if (itemExists) {
-      _quantityControllers[order.itemId]?.text = order.quantity.toString();
-      _orderQuantities[order.itemId] = order.quantity;
-    } else {
-      // Item not found in current master items - show warning
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Warning: The ordered item is no longer available in the current branch inventory. You can still update the order details.'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    }
   }
 
   Future<void> _loadMasterItems() async {
@@ -304,13 +318,13 @@ class _OrderScreenState extends State<OrderScreen> {
                           ),
                         ),
                       ),
-                      // View Inventory button for edit mode - directs to inventory screen
+                      // View Order List button for edit mode - directs to order list screen
                       ElevatedButton(
                         onPressed: () {
                           Navigator.of(context).pop(); // Close dialog
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
-                              builder: (_) => InventoryScreen(initialBranch: _selectedBranch),
+                              builder: (_) => const OrderListScreen(),
                             ),
                           );
                         },
@@ -323,7 +337,7 @@ class _OrderScreenState extends State<OrderScreen> {
                           padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
                         child: Text(
-                          'View Inventory',
+                          'View Order List',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -540,11 +554,21 @@ class _OrderScreenState extends State<OrderScreen> {
                       children: [
                         IconButton(
                           onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => const HomeScreen(initialIndex: 0),
-                              ),
-                            );
+                            if (widget.editOrder != null) {
+                              // If editing, navigate to order list screen
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const OrderListScreen(),
+                                ),
+                              );
+                            } else {
+                              // If creating new order, navigate to home screen
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const HomeScreen(initialIndex: 0),
+                                ),
+                              );
+                            }
                           },
                           icon: Icon(
                             Icons.arrow_back,

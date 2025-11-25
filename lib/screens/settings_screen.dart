@@ -15,7 +15,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _isOfflineMode = false;
 
   @override
   void initState() {
@@ -32,25 +31,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isOfflineMode = prefs.getBool('offlineMode') ?? false;
-    });
+    // Load settings if needed
   }
 
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('offlineMode', _isOfflineMode);
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Settings saved successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
 
   Future<void> _changePassword() async {
     final current = _currentPasswordController.text.trim();
@@ -318,39 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ],
                                   ),
                                 ),
-                                const Divider(height: 1),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.wifi_off,
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                        size: 24,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          'Offline Mode',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                                          ),
-                                        ),
-                                      ),
-                                      Switch(
-                                        value: _isOfflineMode,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _isOfflineMode = value;
-                                          });
-                                        },
-                                        activeColor: isDarkMode ? Colors.blue[400] : Color(0xFF0651A4),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+
                               ],
                             ),
                           ),
@@ -513,29 +465,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: _saveSettings,
-                              icon: const Icon(Icons.save),
-                              label: const Text('Save Settings'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                elevation: 6,
-                                shadowColor: const Color(
-                                  0xFF0651A4,
-                                ).withOpacity(isDarkMode ? 0.5 : 0.3),
-                              ),
-                            ),
-                          ),
+
                         ],
                       ),
                     ),

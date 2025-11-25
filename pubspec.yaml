@@ -143,3 +143,23 @@ flutter:
   #
   # For details regarding fonts from package dependencies, see
   # https://flutter.dev/to/font-from-package
+
+# Flutter Launcher Icons configuration
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "GIDCbg.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "GIDCbg.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "GIDCbg.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  macos:
+    generate: true
+    image_path: "GIDCbg.png"

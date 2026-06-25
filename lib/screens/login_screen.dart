@@ -20,17 +20,8 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isPasswordVisible = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  int _hiddenButtonClickCount = 0;
   bool _isDarkMode = false;
   
-  // Flexible text messages for hidden button progressive feedback
-  final List<String> _hiddenButtonMessages = [
-    '...',
-    '.....',
-    '.......',
-  ];
-
-  // Flexible spacing values for hidden account creation dialog
   final double _dialogTitleSpacing = 10.0;
   final double _dialogFieldSpacing = 16.0;
 
@@ -67,7 +58,6 @@ class _LoginScreenState extends State<LoginScreen>
         );
 
         if (user != null) {
-          // Save login state
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLoggedIn', true);
           await prefs.setString('username', user.username);
@@ -75,14 +65,12 @@ class _LoginScreenState extends State<LoginScreen>
 
           if (!mounted) return;
 
-          // Navigate to home screen
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         } else {
           if (!mounted) return;
 
-          // Show error message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Invalid username or password'),
@@ -93,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen>
       } catch (e) {
         if (!mounted) return;
 
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
@@ -107,25 +94,6 @@ class _LoginScreenState extends State<LoginScreen>
           });
         }
       }
-    }
-  }
-
-  void _handleHiddenButtonClick() {
-    _hiddenButtonClickCount++;
-    if (_hiddenButtonClickCount >= 4) {
-      _showAdminAccountCreationDialog();
-      _hiddenButtonClickCount = 0; // Reset counter
-    }
-    
-    // Show progressive visual feedback using flexible messages
-    if (_hiddenButtonClickCount > 0 && _hiddenButtonClickCount <= _hiddenButtonMessages.length) {
-      final messageIndex = _hiddenButtonClickCount - 1;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_hiddenButtonMessages[messageIndex]),
-          duration: const Duration(milliseconds: 500),
-        ),
-      );
     }
   }
 
@@ -210,7 +178,6 @@ class _LoginScreenState extends State<LoginScreen>
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                _hiddenButtonClickCount = 0;
               },
               child: const Text('Cancel'),
             ),
@@ -218,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen>
               onPressed: () async {
                 if (formKeyAdmin.currentState!.validate()) {
                   try {
-                    // Create admin user using registerUser method
                     await AppDatabase.instance.registerUser(
                       adminUsernameController.text.trim(),
                       adminPasswordController.text,
@@ -509,24 +475,17 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-            // Hidden button for admin account creation
+            // Admin button for account creation
             Positioned(
               bottom: 20,
               right: 20,
-              child: GestureDetector(
-                onTap: _handleHiddenButtonClick,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Icon(
-                    Icons.settings,
-                    size: 18,
-                    color: Colors.white.withOpacity(0.01), // Extremely hidden, practically invisible
-                  ),
+              child: FloatingActionButton(
+                mini: true,
+                onPressed: _showAdminAccountCreationDialog,
+                backgroundColor: _isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                child: Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.white,
                 ),
               ),
             ),

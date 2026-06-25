@@ -3,7 +3,16 @@ import 'package:provider/provider.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/providers/order_provider.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
+import 'package:warehouse_inventory/utils/user_helper.dart';
+import 'package:excel/excel.dart' as excel_package;
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:warehouse_inventory/screens/account_screen.dart';
+import 'package:warehouse_inventory/screens/inventory_screen.dart';
 import 'package:warehouse_inventory/screens/order_screen.dart';
+
 
 class OrderListScreen extends StatefulWidget {
   final String? initialBatchId;
@@ -15,11 +24,12 @@ class OrderListScreen extends StatefulWidget {
 }
 
 class _OrderListScreenState extends State<OrderListScreen> {
-  String? _selectedBranch;
-  String? _selectedProduct;
-  List<Branch> _branches = [];
-  String _searchQuery = '';
-  String? _filterBatchId;
+   String? _selectedBranch;
+   String? _selectedProduct;
+   List<Branch> _branches = [];
+   String _searchQuery = '';
+   String? _filterBatchId;
+   Map<int, Map<String, String>> _itemDetails = {};
 
   @override
   void initState() {
@@ -27,16 +37,43 @@ class _OrderListScreenState extends State<OrderListScreen> {
     _filterBatchId = widget.initialBatchId;
     // Refresh orders when screen is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<OrderProvider>().loadOrders();
-      _loadBranches();
+      if (mounted) {
+        context.read<OrderProvider>().loadOrders();
+        _loadBranches();
+        _loadItems();
+      }
     });
   }
 
   Future<void> _loadBranches() async {
     final branches = await AppDatabase.instance.getAllBranches();
-    setState(() {
-      _branches = branches..sort((a, b) => a.id.compareTo(b.id));
-    });
+    if (mounted) {
+      setState(() {
+        _branches = branches..sort((a, b) => a.id.compareTo(b.id));
+      });
+    }
+  }
+
+  Future<void> _loadItems() async {
+    final masterItems = await AppDatabase.instance.getAllMasterItems();
+    final inventoryItems = await AppDatabase.instance.getAllInventoryItems();
+    if (mounted) {
+      setState(() {
+        _itemDetails = {};
+        for (final item in masterItems) {
+          _itemDetails[item.id] = {
+            'sku': item.sku,
+            'description': item.description,
+          };
+        }
+        for (final item in inventoryItems) {
+          _itemDetails[item.id] = {
+            'sku': item.sku,
+            'description': item.description,
+          };
+        }
+      });
+    }
   }
 
   @override
@@ -67,41 +104,64 @@ class _OrderListScreenState extends State<OrderListScreen> {
         final branchIds = allOrders.map((o) => o.branchId).toSet().toList()..sort();
         final products = allOrders.map((o) => o.brand).toSet().toList()..sort();
 
-        // Group orders by batchId
-        final orderBatches = <String, List<Order>>{};
-        for (final order in orders) {
-          final batchId = order.batchId ?? 'single_${order.id}';
-          if (!orderBatches.containsKey(batchId)) {
-            orderBatches[batchId] = [];
-          }
-          orderBatches[batchId]!.add(order);
-        }
 
-        final batchList = orderBatches.entries.toList()
-          ..sort(
-            (a, b) =>
-                b.value.first.dateOrdered.compareTo(a.value.first.dateOrdered),
-          );
+        final sortedOrders = orders..sort((a, b) => b.dateOrdered.compareTo(a.dateOrdered));
 
         return Scaffold(
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: orders.isEmpty ? FloatingActionButton(
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const OrderScreen(),
+                  builder: (_) => const InventoryScreen(),
                 ),
               ).then((_) {
-                // Refresh orders after returning from order screen
+                // Refresh orders after returning from inventory screen
                 if (mounted) {
-                  context.read<OrderProvider>().loadOrders();
+                  Provider.of<OrderProvider>(context, listen: false).loadOrders();
                 }
               });
             },
             backgroundColor: const Color(0xFF0651A4),
             foregroundColor: Colors.white,
             elevation: 6,
-            tooltip: 'Go to Order Screen',
+            tooltip: 'Go to Inventory Screen',
             child: const Icon(Icons.shopping_cart),
+          ) : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Download XLSX Floating Action Button
+              FloatingActionButton(
+                onPressed: () => _downloadBatchListAsXLSX(context, orders, _branches),
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                elevation: 6,
+                tooltip: 'Send Batch List as XLSX',
+                heroTag: "download_xlsx",
+                child: const Icon(Icons.send),
+              ),
+              const SizedBox(width: 16),
+              // Add Order Floating Action Button
+              FloatingActionButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const InventoryScreen(),
+                    ),
+                  ).then((_) {
+                    // Refresh orders after returning from inventory screen
+                    if (mounted) {
+                      context.read<OrderProvider>().loadOrders();
+                    }
+                  });
+                },
+                backgroundColor: const Color(0xFF0651A4),
+                foregroundColor: Colors.white,
+                elevation: 6,
+                tooltip: 'Go to Inventory Screen',
+                heroTag: "add_order",
+                child: const Icon(Icons.inventory),
+              ),
+            ],
           ),
           body: Container(
             decoration: BoxDecoration(
@@ -257,7 +317,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       ),
                       const SizedBox(height: 16),
                       Expanded(
-                        child: batchList.isEmpty
+                        child: orders.isEmpty
                             ? Center(
                                 child: Padding(
                                   padding: const EdgeInsets.all(24.0),
@@ -309,25 +369,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                 padding: EdgeInsets.all(
                                   isSmallScreen ? 16.0 : 24.0,
                                 ),
-                                itemCount: batchList.length,
+                                itemCount: sortedOrders.length,
                                 itemBuilder: (context, index) {
-                                  final batchEntry = batchList[index];
-                                  final batchOrders = batchEntry.value;
-                                  final firstOrder = batchOrders.first;
-                                  final totalItems = batchOrders.length;
-                                  final totalQuantity = batchOrders.fold(
-                                    0,
-                                    (sum, order) => sum + order.quantity,
-                                  );
-                                  
+                                  final order = sortedOrders[index];
+                                  final itemDetails = _itemDetails[order.itemId];
+                                  final description = itemDetails?['description'] ?? 'Unknown Item';
+                                  final sku = itemDetails?['sku'] ?? 'Unknown SKU';
+
                                   // Parse date string for display
-                                  DateTime? firstOrderDate;
+                                  DateTime? orderDate;
                                   try {
-                                    firstOrderDate = DateTime.parse(firstOrder.dateOrdered);
+                                    orderDate = DateTime.parse(order.dateOrdered);
                                   } catch (e) {
-                                    firstOrderDate = null;
+                                    orderDate = null;
                                   }
-                                  
+
                                   return Card(
                                     elevation: 6,
                                     margin: const EdgeInsets.only(bottom: 16),
@@ -338,160 +394,140 @@ class _OrderListScreenState extends State<OrderListScreen> {
                                     shadowColor: const Color(
                                       0xFF0651A4,
                                     ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
-                                    child: InkWell(
-                                      onTap: () => _showBatchDetails(
-                                        context,
-                                        batchOrders,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(20.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Container(
-                                                  padding: const EdgeInsets.all(
-                                                    12,
-                                                  ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          15,
-                                                        ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.inventory_2,
-                                                    color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                    size: 24,
-                                                  ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(20.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(
+                                                  12,
                                                 ),
-                                                const SizedBox(width: 16),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        'Order Batch',
-                                                        style: TextStyle(
-                                                          fontSize: 18,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                                                        ),
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        15,
                                                       ),
-                                                      Text(
-                                                        '$totalItems item${totalItems > 1 ? 's' : ''} • Total: $totalQuantity units',
-                                                        style: TextStyle(
-                                                          fontSize: 14,
-                                                          color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
                                                 ),
-                                                Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 6,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          15,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    firstOrderDate != null 
-                                                        ? '${firstOrderDate.day}/${firstOrderDate.month}/${firstOrderDate.year}'
-                                                        : firstOrder.dateOrdered,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
+                                                child: Icon(
+                                                  Icons.inventory_2,
+                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                  size: 24,
                                                 ),
-                                              ],
-                                            ),
-                                            const Divider(height: 20),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: _buildInfoItem(
-                                                    'Branch',
-                                                    _branches.firstWhere(
-                                                      (b) => b.id == firstOrder.branchId,
-                                                      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
-                                                    ).name,
-                                                    isDarkMode: isDarkMode,
-                                                  ),
-                                                ),
-                                                Expanded(
-                                                  child: _buildInfoItem(
-                                                    'Location',
-                                                    firstOrder.location,
-                                                    isDarkMode: isDarkMode,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 6,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                                      borderRadius:
-                                                          BorderRadius.circular(15),
-                                                    ),
-                                                    child: Text(
-                                                      'Tap to view order details',
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment
+                                                          .start,
+                                                  children: [
+                                                    Text(
+                                                      description,
                                                       style: TextStyle(
-                                                        fontSize: 12,
-                                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                        fontStyle: FontStyle.italic,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      'SKU: $sku • Qty: ${order.quantity}',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
                                                       ),
                                                     ),
-                                                  ),
+                                                  ],
                                                 ),
-                                                const SizedBox(width: 8),
-                                                IconButton(
-                                                  onPressed: () => _editOrderBatch(batchOrders),
-                                                  icon: Icon(
-                                                    Icons.edit,
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        15,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  orderDate != null
+                                                      ? '${orderDate.day}/${orderDate.month}/${orderDate.year}'
+                                                      : order.dateOrdered,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
                                                     color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                                    size: 20,
+                                                    fontWeight:
+                                                        FontWeight.bold,
                                                   ),
-                                                  tooltip: 'Edit Order',
                                                 ),
-                                                IconButton(
-                                                  onPressed: () => _deleteOrderBatch(batchOrders),
-                                                  icon: Icon(
-                                                    Icons.delete,
-                                                    color: Colors.red,
-                                                    size: 20,
-                                                  ),
-                                                  tooltip: 'Delete Order',
+                                              ),
+                                            ],
+                                          ),
+                                          const Divider(height: 20),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Branch',
+                                                  _branches.firstWhere(
+                                                    (b) => b.id == order.branchId,
+                                                    orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: ''),
+                                                  ).name,
+                                                  isDarkMode: isDarkMode,
                                                 ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
+                                              ),
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Location',
+                                                  order.location,
+                                                  isDarkMode: isDarkMode,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: _buildInfoItem(
+                                                  'Brand',
+                                                  order.brand,
+                                                  isDarkMode: isDarkMode,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              IconButton(
+                                                onPressed: () => _editSingleOrder(order),
+                                                icon: Icon(
+                                                  Icons.edit,
+                                                  color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'Edit Order',
+                                              ),
+                                              IconButton(
+                                                onPressed: () => _deleteSingleOrder(order),
+                                                icon: Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                  size: 20,
+                                                ),
+                                                tooltip: 'Delete Order',
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   );
@@ -535,7 +571,242 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _showFilterDialog(BuildContext context, List<int> branchIds, List<String> products, List<Order> allOrders) {
+  Future<void> _downloadBatchListAsXLSX(BuildContext buildContext, List<Order> orders, List<Branch> branches) async {
+    if (orders.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(buildContext).showSnackBar(
+          const SnackBar(
+            content: Text('No orders to export'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Show loading indicator
+      if (mounted) {
+        showDialog(
+          context: buildContext,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) {
+            if (!mounted) {
+              return const SizedBox.shrink();
+            }
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+      }
+
+      // Create Excel workbook
+      final excel = excel_package.Excel.createExcel();
+      
+      // Get the default sheet or create if doesn't exist
+      var sheetObject = excel['Sheet1'];
+      
+      // Add headers - SKU and Description as first two columns
+      sheetObject.appendRow([
+        'SKU',
+        'Description',
+        'Date Ordered',
+        'Branch Code',
+        'Location',
+        'Brand',
+        'Quantity',
+        'Status'
+      ]);
+
+      // Group orders by batch ID for summary
+      final orderBatches = <String, List<Order>>{};
+      for (final order in orders) {
+        final batchId = order.batchId ?? 'single_${order.id}';
+        if (!orderBatches.containsKey(batchId)) {
+          orderBatches[batchId] = [];
+        }
+        orderBatches[batchId]!.add(order);
+      }
+
+      // Get all master items and inventory items to look up SKU and Description
+      final masterItems = await AppDatabase.instance.getAllMasterItems();
+      final inventoryItems = await AppDatabase.instance.getAllInventoryItems();
+
+      // Combine both lists for easier lookup
+      final allItems = <int, Map<String, String>>{};
+      
+      // Add master items
+      for (final item in masterItems) {
+        allItems[item.id] = {
+          'sku': item.sku,
+          'description': item.description,
+        };
+      }
+      
+      // Add inventory items (will override if same ID exists in master)
+      for (final item in inventoryItems) {
+        allItems[item.id] = {
+          'sku': item.sku,
+          'description': item.description,
+        };
+      }
+
+      // Add order data (SKU, Description, and all order information)
+      for (final order in orders) {
+        final branchCode = branches.firstWhere(
+          (b) => b.id == order.branchId,
+          orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: '', code: 'N/A'),
+        ).code ?? 'N/A';
+
+        // Parse date for better formatting
+        DateTime? orderDate;
+        try {
+          orderDate = DateTime.parse(order.dateOrdered);
+        } catch (e) {
+          orderDate = null;
+        }
+
+        // Get SKU and Description for this order item
+        final itemDetails = allItems[order.itemId];
+        final sku = itemDetails?['sku'] ?? 'Unknown SKU';
+        final description = itemDetails?['description'] ?? 'Unknown Description';
+
+        sheetObject.appendRow([
+          sku,
+          description,
+          orderDate != null 
+              ? DateFormat('yyyy-MM-dd HH:mm').format(orderDate) 
+              : order.dateOrdered,
+          branchCode,
+          order.location,
+          order.brand,
+          order.quantity.toString(),
+          order.status,
+        ]);
+      }
+
+      // Add user information section at the very end
+      final currentUser = await UserHelper.getCurrentUser();
+      final username = currentUser?['username'] ?? 'Unknown User';
+      final role = currentUser?['role'] ?? 'user';
+      final exportTime = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      
+      // Add empty row for separation before user info
+      sheetObject.appendRow(['', '', '', '', '', '', '', '']);
+      
+      // Add user information as separate rows (after all order data)
+      sheetObject.appendRow(['Exported By: $username', '', '', '', '', '', '', '']);
+      sheetObject.appendRow(['Role: $role', '', '', '', '', '', '', '']);
+      sheetObject.appendRow(['Export Time: $exportTime', '', '', '', '', '', '', '']);
+
+      // Add a summary sheet
+      var summarySheet = excel['Summary'];
+      
+      // Add summary headers
+      summarySheet.appendRow([
+        'Batch ID',
+        'Order Count',
+        'Total Quantity',
+        'Date Ordered',
+        'Branch Code',
+        'Location'
+      ]);
+
+      // Add batch summary data
+      final batchList = orderBatches.entries.toList()
+        ..sort((a, b) => b.value.first.dateOrdered.compareTo(a.value.first.dateOrdered));
+
+      for (final batchEntry in batchList) {
+        final batchOrders = batchEntry.value;
+        final firstOrder = batchOrders.first;
+        final totalItems = batchOrders.length;
+        final totalQuantity = batchOrders.fold(0, (sum, order) => sum + order.quantity);
+        
+        final branchCode = branches.firstWhere(
+          (b) => b.id == firstOrder.branchId,
+          orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: '', code: 'N/A'),
+        ).code ?? 'N/A';
+
+        // Parse date for better formatting
+        DateTime? orderDate;
+        try {
+          orderDate = DateTime.parse(firstOrder.dateOrdered);
+        } catch (e) {
+          orderDate = null;
+        }
+
+        summarySheet.appendRow([
+          batchEntry.key,
+          totalItems.toString(),
+          totalQuantity.toString(),
+          orderDate != null 
+              ? DateFormat('yyyy-MM-dd HH:mm').format(orderDate) 
+              : firstOrder.dateOrdered,
+          branchCode,
+          firstOrder.location,
+        ]);
+      }
+
+      // Generate filename with timestamp
+      final now = DateTime.now();
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(now);
+      final filename = 'batch_list_$timestamp.xlsx';
+
+      // Save the file
+      final bytes = excel.encode();
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/$filename');
+      await file.writeAsBytes(bytes!);
+
+      // Close loading indicator
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      // Share the file using Share Plus
+      final xFile = XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      await Share.shareXFiles(
+        [xFile],
+        subject: 'Order Batch List - $timestamp',
+        text: 'Please find attached the order batch list generated on ${DateFormat('yyyy-MM-dd HH:mm').format(now)}',
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(buildContext).showSnackBar(
+          const SnackBar(
+            content: Text('Batch list are sent successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // Clean up temporary file after sharing (optional)
+      // Uncomment if you want to delete the file after sharing
+      /*
+      Future.delayed(const Duration(seconds: 5), () {
+        if (file.existsSync()) {
+          file.deleteSync();
+        }
+      });
+      */
+
+    } catch (e) {
+      // Close loading indicator if still open
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating XLSX file: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showFilterDialog(BuildContext buildContext, List<int> branchIds, List<String> products, List<Order> allOrders) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     // Local variables for dialog state
     String? localSelectedBranch = _selectedBranch;
@@ -769,19 +1040,24 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _editOrderBatch(List<Order> batchOrders) {
-    // Navigate to order screen with pre-filled data for editing
+
+  void _editSingleOrder(Order order) {
+    // Navigate to order screen with the specific order for editing
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OrderScreen(editBatch: batchOrders),
+        builder: (_) => OrderScreen(editOrder: order),
       ),
     ).then((_) {
       // Refresh orders after returning from edit screen
-      context.read<OrderProvider>().loadOrders();
+      if (mounted) {
+        context.read<OrderProvider>().loadOrders();
+      }
     });
   }
 
-  void _deleteOrderBatch(List<Order> batchOrders) {
+
+
+  void _deleteSingleOrder(Order order) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
@@ -789,13 +1065,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
         return AlertDialog(
           backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
           title: Text(
-            'Delete Order Batch',
+            'Delete Order',
             style: TextStyle(
               color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
             ),
           ),
           content: Text(
-            'Are you sure you want to delete this order batch with ${batchOrders.length} items?',
+            'Are you sure you want to delete this order?',
             style: TextStyle(
               color: isDarkMode ? Colors.white70 : Colors.black87,
             ),
@@ -814,15 +1090,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
               onPressed: () async {
                 Navigator.of(context).pop();
                 try {
-                  for (final order in batchOrders) {
-                    await AppDatabase.instance.deleteOrder(order.id);
-                  }
+                  await AppDatabase.instance.deleteOrder(order.id);
                   // Refresh the orders list
                   if (mounted) {
                     context.read<OrderProvider>().loadOrders();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Order batch deleted successfully'),
+                        content: Text('Order deleted successfully'),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -831,7 +1105,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error deleting order batch: ${e.toString()}'),
+                        content: Text('Error deleting order: ${e.toString()}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -849,174 +1123,4 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
-  void _showBatchDetails(BuildContext context, List<Order> batchOrders) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.list_alt, color: Colors.white, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Order Batch Details (${batchOrders.length} items)',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 300,
-                  child: ListView.builder(
-                    itemCount: batchOrders.length,
-                    itemBuilder: (context, index) {
-                      final order = batchOrders[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        color: isDarkMode ? Colors.grey[800] : Colors.white,
-                        shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.2),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: const Color(
-                                      0xFF0651A4,
-                                    ).withValues(alpha: isDarkMode ? 0.3 : 0.1),
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF0651A4),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Item ${index + 1}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: isDarkMode ? Colors.white : const Color(0xFF0651A4),
-                                          ),
-                                        ),
-                                        Text(
-                                          'Brand: ${order.brand}',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                        Text(
-                                          'Item ID: ${order.itemId}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : const Color(0xFF0651A4).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    child: Text(
-                                      'Qty: ${order.quantity}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? Colors.white70 : const Color(0xFF0651A4),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? const Color(0xFF1E3A5F) : const Color(0xFF0651A4),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 4,
-                      shadowColor: const Color(0xFF0651A4).withValues(alpha: isDarkMode ? 0.5 : 0.3),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

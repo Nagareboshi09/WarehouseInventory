@@ -1,12 +1,29 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:bcrypt/bcrypt.dart';
 
 part 'app_database.g.dart';
+
+// Password hashing utilities using bcrypt
+class PasswordUtils {
+  static String hashPassword(String password) {
+    // Use bcrypt for secure password hashing
+    final hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+    return hashedPassword;
+  }
+
+  static bool verifyPassword(String plainPassword, String hashedPassword) {
+    // Verify password using bcrypt
+    return BCrypt.checkpw(plainPassword, hashedPassword);
+  }
+}
 
 // Define all our tables as classes
 @DataClassName('User')
@@ -113,73 +130,6 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-// Add this method to your AppDatabase class in app_database.dart
-Future<void> customWriteTransaction(Future<void> Function() action) async {
-  await transaction<void>(() async {
-    await action();
-  });
-}
-
-// Fixed batch insert method - use proper table references
-Future<void> batchInsertMasterAndInventoryItems(
-  List<MasterItem> items, // Renamed parameter to avoid conflict
-  List<int> quantities,
-  int branchId,
-) async {
-  await transaction(() async {
-    for (var i = 0; i < items.length; i++) {
-      final item = items[i];
-      final quantity = quantities[i];
-
-      // Insert into master_items - use the actual table from database
-      await into(masterItems).insert(MasterItemsCompanion.insert(
-        sku: item.sku,
-        description: item.description,
-        location: item.location,
-        brand: item.brand != null ? Value(item.brand) : const Value.absent(),
-        branchId: branchId,
-      ));
-
-      // Insert into inventory_items - use the actual table from database
-      await into(inventoryItems).insert(InventoryItemsCompanion.insert(
-        sku: item.sku,
-        description: item.description,
-        end: quantity,
-        location: item.location,
-        brand: item.brand != null ? Value(item.brand) : const Value.absent(),
-        dateAdded: DateTime.now().toIso8601String(),
-        branchId: branchId,
-      ));
-    }
-  });
-}
-
-// Add this optimized validation method
-Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId) async {
-  final result = <String, bool>{};
-  
-  await transaction(() async {
-    // Get all existing SKUs in this branch in one query
-    final existingMasterSkus = await (select(masterItems)
-      ..where((m) => m.branchId.equals(branchId) & m.sku.isIn(skus)))
-      .get()
-      .then((items) => items.map((item) => item.sku).toSet());
-    
-    final existingInventorySkus = await (select(inventoryItems)
-      ..where((i) => i.branchId.equals(branchId) & i.sku.isIn(skus)))
-      .get()
-      .then((items) => items.map((item) => item.sku).toSet());
-    
-    final allExistingSkus = {...existingMasterSkus, ...existingInventorySkus};
-    
-    for (final sku in skus) {
-      result[sku] = !allExistingSkus.contains(sku);
-    }
-  });
-  
-  return result;
-}
-
   // Database connection helper
   static QueryExecutor _openConnection() {
     if (kIsWeb) {
@@ -199,44 +149,191 @@ Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId)
     );
   }
 
+  // Custom transaction method
+  Future<void> customWriteTransaction(Future<void> Function() action) async {
+    await transaction<void>(() async {
+      await action();
+    });
+  }
+
+  // Fixed batch insert method - use proper table references
+  Future<void> batchInsertMasterAndInventoryItems(
+    List<MasterItem> items, // Renamed parameter to avoid conflict
+    List<int> quantities,
+    int branchId,
+  ) async {
+    await transaction(() async {
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        final quantity = quantities[i];
+
+        // Insert into master_items - use the actual table from database
+        await into(masterItems).insert(MasterItemsCompanion.insert(
+          sku: item.sku,
+          description: item.description,
+          location: item.location,
+          brand: item.brand != null ? Value(item.brand) : const Value.absent(),
+          branchId: branchId,
+        ));
+
+        // Insert into inventory_items - use the actual table from database
+        await into(inventoryItems).insert(InventoryItemsCompanion.insert(
+          sku: item.sku,
+          description: item.description,
+          end: quantity,
+          location: item.location,
+          brand: item.brand != null ? Value(item.brand) : const Value.absent(),
+          dateAdded: DateTime.now().toIso8601String(),
+          branchId: branchId,
+        ));
+      }
+    });
+  }
+
+  // Add this optimized validation method
+  Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId) async {
+    final result = <String, bool>{};
+    
+    await transaction(() async {
+      // Get all existing SKUs in this branch in one query
+      final existingMasterSkus = await (select(masterItems)
+        ..where((m) => m.branchId.equals(branchId) & m.sku.isIn(skus)))
+        .get()
+        .then((items) => items.map((item) => item.sku).toSet());
+      
+      final existingInventorySkus = await (select(inventoryItems)
+        ..where((i) => i.branchId.equals(branchId) & i.sku.isIn(skus)))
+        .get()
+        .then((items) => items.map((item) => item.sku).toSet());
+      
+      final allExistingSkus = {...existingMasterSkus, ...existingInventorySkus};
+      
+      for (final sku in skus) {
+        result[sku] = !allExistingSkus.contains(sku);
+      }
+    });
+    
+    return result;
+  }
+
   // Data seeding
   Future<void> _insertDefaultData() async {
-    // Check if we already have data
-    final userCount = await select(users).get().then((list) => list.length);
-    if (userCount > 0) return; // Data already exists
-
-    // Insert default admin user
-    await into(users).insert(
-      UsersCompanion.insert(
-        username: 'admin',
-        password: 'admin123',
-        role: 'admin',
-      ),
-    );
-    
-    // Note: Sample branches and items have been removed
-    // Users can now add their own branches and inventory through the app interface
+    // No default data inserted
+    // Users must register their own accounts through the registration screen
   }
 
   // User methods
   Future<User?> getUser(String username, String password) async {
-    final query = (select(users)
-      ..where((u) => u.username.equals(username) & u.password.equals(password)));
+    // First, get the user by username
+    final userData = await (select(users)
+      ..where((u) => u.username.equals(username))).getSingleOrNull();
     
-    final userData = await query.getSingleOrNull();
-    return userData; // Return the generated User class directly
+    if (userData == null) {
+      return null; // User not found
+    }
+
+    // Verify the password hash
+    if (PasswordUtils.verifyPassword(password, userData.password)) {
+      return userData;
+    }
+    
+    return null; // Password doesn't match
+  }
+
+  // Check if username already exists
+  Future<bool> usernameExists(String username) async {
+    final existingUser = await (select(users)
+      ..where((u) => u.username.equals(username))).getSingleOrNull();
+    return existingUser != null;
+  }
+
+  // Register a new user with hashed password
+  Future<User?> registerUser(String username, String password, {String role = 'user'}) async {
+    try {
+      // Check if username already exists
+      final exists = await usernameExists(username);
+      if (exists) {
+        return null; // Username already taken
+      }
+
+      // Hash the password and insert new user
+      final hashedPassword = PasswordUtils.hashPassword(password);
+      final userId = await into(users).insert(
+        UsersCompanion.insert(
+          username: username,
+          password: hashedPassword,
+          role: role,
+        ),
+      );
+
+      // Return the created user
+      final newUser = await (select(users)
+        ..where((u) => u.id.equals(userId))).getSingle();
+      
+      return newUser;
+    } catch (e) {
+      // Handle any database errors
+      print('Error registering user: $e');
+      return null;
+    }
+  }
+
+  // Get all users (for admin purposes)
+  Future<List<User>> getAllUsers() async {
+    final result = await select(users).get();
+    return result;
+  }
+
+  // Update user role
+  Future<bool> updateUserRole(int userId, String newRole) async {
+    try {
+      final user = await (select(users)..where((u) => u.id.equals(userId))).getSingleOrNull();
+      if (user != null) {
+        await update(users).replace(user.copyWith(role: newRole));
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error updating user role: $e');
+      return false;
+    }
+  }
+
+  // Update user password
+  Future<bool> updateUserPassword(String username, String newPassword) async {
+    try {
+      final hashedPassword = PasswordUtils.hashPassword(newPassword);
+      final updatedRows = await (update(users)
+        ..where((u) => u.username.equals(username)))
+        .write(UsersCompanion(password: Value(hashedPassword)));
+      return updatedRows > 0;
+    } catch (e) {
+      print('Error updating user password: $e');
+      return false;
+    }
+  }
+
+  // Delete user by ID
+  Future<bool> deleteUser(int userId) async {
+    try {
+      final deletedRows = await (delete(users)..where((u) => u.id.equals(userId))).go();
+      return deletedRows > 0;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return false;
+    }
   }
 
   // Branch methods
   Future<List<Branch>> getAllBranches() async {
     final result = await select(branches).get();
-    return result; // Return the generated Branch class directly
+    return result;
   }
 
   Future<Branch?> getBranchByCode(String code) async {
     final result = await (select(branches)
       ..where((b) => b.code.equals(code))).getSingleOrNull();
-    return result; // Return the generated Branch class directly
+    return result;
   }
 
   Future<bool> branchCodeExists(String code) async {
@@ -308,12 +405,12 @@ Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId)
   // Master Items methods
   Future<List<MasterItem>> getAllMasterItems() async {
     final result = await select(masterItems).get();
-    return result; // Return the generated MasterItem class directly
+    return result;
   }
 
   Future<List<MasterItem>> getMasterItemsByBranch(int branchId) async {
     final result = await (select(masterItems)..where((m) => m.branchId.equals(branchId))).get();
-    return result; // Return the generated MasterItem class directly
+    return result;
   }
 
   Future<int> insertMasterItem(MasterItem item) async {
@@ -337,23 +434,23 @@ Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId)
   // Inventory methods
   Future<List<InventoryItem>> getAllInventoryItems() async {
     final result = await select(inventoryItems).get();
-    return result; // Return the generated InventoryItem class directly
+    return result;
   }
 
   Future<List<InventoryItem>> getInventoryItemsByBranch(int branchId) async {
     final result = await (select(inventoryItems)..where((i) => i.branchId.equals(branchId))).get();
-    return result; // Return the generated InventoryItem class directly
+    return result;
   }
 
   Future<List<InventoryItem>> searchInventoryItems(String query) async {
     final result = await (select(inventoryItems)
       ..where((i) => i.sku.like('%$query%') | i.description.like('%$query%'))).get();
-    return result; // Return the generated InventoryItem class directly
+    return result;
   }
 
   Future<List<InventoryItem>> getLowStockItems(int threshold) async {
     final result = await (select(inventoryItems)..where((i) => i.end.isSmallerThanValue(threshold + 1))).get();
-    return result; // Return the generated InventoryItem class directly
+    return result;
   }
 
   Future<int> insertInventoryItem(InventoryItem item) async {
@@ -382,12 +479,17 @@ Future<Map<String, bool>> validateSkusForBranch(List<String> skus, int branchId)
   // Order methods
   Future<List<Order>> getAllOrders() async {
     final result = await select(orders).get();
-    return result; // Return the generated Order class directly
+    return result;
   }
 
   Future<List<Order>> getOrdersByBranch(int branchId) async {
     final result = await (select(orders)..where((o) => o.branchId.equals(branchId))).get();
-    return result; // Return the generated Order class directly
+    return result;
+  }
+
+  Future<List<Order>> getOrdersByItem(int itemId) async {
+    final result = await (select(orders)..where((o) => o.itemId.equals(itemId))).get();
+    return result;
   }
 
   Future<int> insertOrder(Order order) async {

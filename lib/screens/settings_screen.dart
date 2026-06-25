@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:warehouse_inventory/theme_notifier.dart';
-// Removed database import - settings_screen.dart only uses SharedPreferences
+import 'package:warehouse_inventory/database/app_database.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -71,32 +71,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    // Load current password
-    final prefs = await SharedPreferences.getInstance();
-    final storedPassword = prefs.getString('password') ?? 'admin123';
+    try {
+      // Get the logged-in username
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('username');
 
-    if (current != storedPassword) {
+      if (username == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
+      }
+
+      // Verify the current password against the database
+      final user = await AppDatabase.instance.getUser(username, current);
+
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Current password is incorrect')),
+        );
+        return;
+      }
+
+      // Update the password in the database
+      final success = await AppDatabase.instance.updateUserPassword(username, newPass);
+
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update password')),
+        );
+        return;
+      }
+
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Current password is incorrect')),
+        const SnackBar(
+          content: Text('Password changed successfully'),
+          backgroundColor: Colors.green,
+        ),
       );
-      return;
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-
-    // Save new password
-    await prefs.setString('password', newPass);
-
-    _currentPasswordController.clear();
-    _newPasswordController.clear();
-    _confirmPasswordController.clear();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password changed successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 
   @override

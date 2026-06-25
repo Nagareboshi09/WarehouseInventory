@@ -7,13 +7,13 @@ import 'package:warehouse_inventory/screens/home_screen.dart';
 import 'package:warehouse_inventory/screens/order_list_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-   final List<Order>? editBatch;
+   final Order? editOrder;
 
-   const OrderScreen({super.key, this.editBatch});
+    const OrderScreen({super.key, this.editOrder});
 
    @override
    State<OrderScreen> createState() => _OrderScreenState();
- }
+}
 
 class _OrderScreenState extends State<OrderScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -32,7 +32,7 @@ class _OrderScreenState extends State<OrderScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.editBatch != null) {
+    if (widget.editOrder != null) {
       _loadEditData();
     } else {
       _loadData();
@@ -61,9 +61,9 @@ class _OrderScreenState extends State<OrderScreen> {
   }
 
   Future<void> _loadEditData() async {
-    if (widget.editBatch == null || widget.editBatch!.isEmpty) return;
+    if (widget.editOrder == null) return;
 
-    final firstOrder = widget.editBatch!.first;
+    final order = widget.editOrder!;
 
     // Wait for branches to be loaded if not already loaded
     if (_branches.isEmpty) {
@@ -72,39 +72,64 @@ class _OrderScreenState extends State<OrderScreen> {
 
     // Find the branch for this order
     final branch = _branches.firstWhere(
-      (b) => b.id == firstOrder.branchId,
-      orElse: () => Branch(id: firstOrder.branchId, name: 'Branch ${firstOrder.branchId}', location: ''),
+      (b) => b.id == order.branchId,
+      orElse: () => Branch(id: order.branchId, name: 'Branch ${order.branchId}', location: ''),
     );
 
     setState(() {
       _selectedBranch = branch;
-      _locationController.text = firstOrder.location;
+      _locationController.text = order.location;
     });
 
     // Load master items for the branch
     await _loadMasterItems();
 
-    // Filter to only show items that are in the edit batch
-    final editBatchItemIds = widget.editBatch!.map((order) => order.itemId).toSet();
+    // For editing, only show the specific order item
     setState(() {
-      _filteredItems = _masterItems.where((item) => editBatchItemIds.contains(item.id)).toList();
-      
-      // Initialize controllers only for items in the edit batch
       _quantityControllers.clear();
       _orderQuantities.clear();
-      for (var item in _filteredItems) {
-        _quantityControllers[item.id ?? 0] = TextEditingController();
-        _orderQuantities[item.id ?? 0] = 0;
-      }
-    });
+      
+      try {
+        // Check if the order item exists in current master items
+        final orderItem = _masterItems.firstWhere(
+          (item) => item.id == order.itemId,
+        );
 
-    // Pre-fill quantities from the edit batch
-    for (final order in widget.editBatch!) {
-      if (_orderQuantities.containsKey(order.itemId)) {
-        _quantityControllers[order.itemId]?.text = order.quantity.toString();
+        // Only show the order item
+        _filteredItems = [orderItem];
+        
+        // Initialize controller and quantity for the order item
+        _quantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
+        _orderQuantities[order.itemId] = order.quantity;
+      } catch (e) {
+        // Item not found in current master items - show warning and create a temporary item
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Warning: The ordered item is no longer available in the current branch inventory. You can still update the order details.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+
+        // Create a temporary item with order details for display
+        final tempItem = MasterItem(
+          id: order.itemId,
+          sku: 'Unknown SKU',
+          description: 'Item ID: ${order.itemId}',
+          location: order.location,
+          brand: order.brand,
+          branchId: order.branchId,
+        );
+
+        _filteredItems = [tempItem];
+        
+        // Initialize controller and quantity for the order item
+        _quantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
         _orderQuantities[order.itemId] = order.quantity;
       }
-    }
+    });
   }
 
   Future<void> _loadMasterItems() async {
@@ -184,249 +209,263 @@ class _OrderScreenState extends State<OrderScreen> {
       _isLoading = true;
     });
 
-    // If editing, delete existing orders first
-    if (widget.editBatch != null) {
-      try {
-        for (final order in widget.editBatch!) {
-          await AppDatabase.instance.deleteOrder(order.id);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating orders: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-    }
-
-    // Generate a unique batch ID for this order session (or use existing if editing)
-    final batchId = widget.editBatch != null
-        ? widget.editBatch!.first.batchId ?? DateTime.now().millisecondsSinceEpoch.toString()
-        : DateTime.now().millisecondsSinceEpoch.toString();
-
-    // Preserve the location value before form reset
-    final savedLocation = _locationController.text.trim();
-
-    // Create orders for each item with quantity > 0
-    List<OrdersCompanion> orderCompanions = [];
-    // Use filtered items if editing, otherwise use all master items
-    final itemsToProcess = widget.editBatch != null ? _filteredItems : _masterItems;
-    for (var item in itemsToProcess) {
-      int quantity = _orderQuantities[item.id ?? 0] ?? 0;
-      if (quantity > 0) {
-        final orderCompanion = OrdersCompanion.insert(
-          branchId: _selectedBranch?.id ?? 0,
-          location: _locationController.text.trim(),
-          brand: item.brand ?? '',
-          itemId: item.id ?? 0,
-          quantity: quantity,
-          dateOrdered: widget.editBatch != null ? widget.editBatch!.first.dateOrdered : DateTime.now().toIso8601String(),
-          status: const drift.Value('pending'),
-          batchId: drift.Value(batchId),
-        );
-        orderCompanions.add(orderCompanion);
-      }
-    }
-
-    // Add orders to provider
     try {
-      for (var orderCompanion in orderCompanions) {
-        await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
+      String? batchId;
+      List<OrdersCompanion>? orderCompanions;
+      String? savedLocation;
+
+      if (widget.editOrder != null) {
+        // If editing, update the existing order
+        final updatedOrder = widget.editOrder!.copyWith(
+          branchId: _selectedBranch?.id ?? widget.editOrder!.branchId,
+          location: _locationController.text.trim(),
+          quantity: _orderQuantities[widget.editOrder!.itemId] ?? widget.editOrder!.quantity,
+          dateOrdered: DateTime.now().toIso8601String(),
+        );
+        await AppDatabase.instance.updateOrder(updatedOrder);
+      } else {
+        // Generate a unique batch ID for this order session
+        batchId = DateTime.now().millisecondsSinceEpoch.toString();
+
+        // Preserve the location value before form reset
+        savedLocation = _locationController.text.trim();
+
+        // Create orders for each item with quantity > 0
+        orderCompanions = [];
+        // Use all master items for new orders
+        for (var item in _masterItems) {
+          int quantity = _orderQuantities[item.id ?? 0] ?? 0;
+          if (quantity > 0) {
+            final orderCompanion = OrdersCompanion.insert(
+              branchId: _selectedBranch?.id ?? 0,
+              location: _locationController.text.trim(),
+              brand: item.brand ?? '',
+              itemId: item.id ?? 0,
+              quantity: quantity,
+              dateOrdered: DateTime.now().toIso8601String(),
+              status: const drift.Value('pending'),
+              batchId: drift.Value(batchId),
+            );
+            orderCompanions.add(orderCompanion);
+          }
+        }
+
+        // Add orders to database (only for new orders)
+        for (var orderCompanion in orderCompanions) {
+          await AppDatabase.instance.into(AppDatabase.instance.orders).insert(orderCompanion);
+        }
+      }
+
+      // Simulate order submission
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+            return AlertDialog(
+              backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 28,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Success!',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                widget.editOrder != null ? 'Order updated successfully!' : '${orderCompanions?.length ?? 0} order(s) submitted successfully!',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
+                  fontSize: 16,
+                ),
+              ),
+              actions: widget.editOrder != null
+                  ? [
+                      // Cancel button for edit mode
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                          foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      // View Order List button for edit mode - directs to order list screen
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const OrderListScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'View Order List',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ]
+                  : [
+                      // Two buttons for create mode
+                      // Stay on current screen button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+
+                          // Reset form for new orders
+                          _formKey.currentState!.reset();
+                          // Don't clear location - keep it for continuity
+                          // Clear quantities
+                          for (var controller in _quantityControllers.values) {
+                            controller.clear();
+                          }
+                          setState(() {
+                            _orderQuantities.clear();
+                            // For new orders, reset all master items
+                            for (var item in _masterItems) {
+                              _orderQuantities[item.id ?? 0] = 0;
+                            }
+                            _searchQuery = '';
+                            _filteredItems = _masterItems;
+                            _inventoryStock.clear();
+                            _itemSales.clear();
+                            // Restore the location field with the saved value
+                            if (savedLocation != null) {
+                              _locationController.text = savedLocation;
+                            }
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                          foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'Continue',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      // Go to orders list button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(); // Close dialog
+
+                          // Navigate to order list screen with the submitted batch ID
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => OrderListScreen(initialBatchId: batchId),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text(
+                          'View Orders',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+            );
+          },
+        );
+
+        // Reset form for new orders (only for create mode)
+        if (widget.editOrder == null) {
+          _formKey.currentState!.reset();
+          // Don't clear location - keep it for continuity
+          // Clear quantities
+          for (var controller in _quantityControllers.values) {
+            controller.clear();
+          }
+          setState(() {
+            _orderQuantities.clear();
+            // For new orders, reset all master items
+            for (var item in _masterItems) {
+              _orderQuantities[item.id ?? 0] = 0;
+            }
+            _searchQuery = '';
+            _filteredItems = _masterItems;
+            _inventoryStock.clear();
+            _itemSales.clear();
+            // Restore the location field with the saved value
+            if (savedLocation != null) {
+              _locationController.text = savedLocation;
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving orders: ${e.toString()}'),
+            content: Text('Error ${widget.editOrder != null ? 'updating' : 'saving'} orders: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    // Simulate order submission
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-          return AlertDialog(
-            backgroundColor: isDarkMode ? Color(0xFF2D2D2D) : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: Row(
-              children: [
-                Icon(
-                  Icons.check_circle,
-                  color: Colors.green,
-                  size: 28,
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Success!',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
-            content: Text(
-              widget.editBatch != null ? 'Order updated successfully!' : '${orderCompanions.length} order(s) submitted successfully!',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white70 : Colors.grey.shade600,
-                fontSize: 16,
-              ),
-            ),
-            actions: [
-              // Stay on current screen button
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  // If editing, go back to order list
-                  if (widget.editBatch != null) {
-                    Navigator.of(context).pop();
-                    return;
-                  }
-                  
-                  // Reset form for new orders
-                  _formKey.currentState!.reset();
-                  // Don't clear location - keep it for continuity
-                  // Clear quantities
-                  for (var controller in _quantityControllers.values) {
-                    controller.clear();
-                  }
-                  setState(() {
-                    _orderQuantities.clear();
-                    if (widget.editBatch != null) {
-                      // For editing mode, reset only the filtered items
-                      for (var item in _filteredItems) {
-                        _orderQuantities[item.id ?? 0] = 0;
-                      }
-                    } else {
-                      // For new orders, reset all master items
-                      for (var item in _masterItems) {
-                        _orderQuantities[item.id ?? 0] = 0;
-                      }
-                    }
-                    _searchQuery = '';
-                    _filteredItems = _masterItems;
-                    _inventoryStock.clear();
-                    _itemSales.clear();
-                    // Restore the location field with the saved value
-                    _locationController.text = savedLocation;
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-                  foregroundColor: isDarkMode ? Colors.white : Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  'Continue',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              // Go to orders list button
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  
-                  // If editing, go back to order list
-                  if (widget.editBatch != null) {
-                    Navigator.of(context).pop();
-                    return;
-                  }
-                  
-                  // Navigate to order list screen with the submitted batch ID
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => OrderListScreen(initialBatchId: batchId),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                child: Text(
-                  'View Orders',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      // If editing, go back to order list
-      if (widget.editBatch != null) {
-        Navigator.of(context).pop();
-        return;
+    } finally {
+      // Always reset loading state
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
-
-      // Reset form for new orders
-      _formKey.currentState!.reset();
-      // Don't clear location - keep it for continuity
-      // Clear quantities
-      for (var controller in _quantityControllers.values) {
-        controller.clear();
-      }
-      setState(() {
-        _orderQuantities.clear();
-        if (widget.editBatch != null) {
-          // For editing mode, reset only the filtered items
-          for (var item in _filteredItems) {
-            _orderQuantities[item.id ?? 0] = 0;
-          }
-        } else {
-          // For new orders, reset all master items
-          for (var item in _masterItems) {
-            _orderQuantities[item.id ?? 0] = 0;
-          }
-        }
-        _searchQuery = '';
-        _filteredItems = _masterItems;
-        _inventoryStock.clear();
-        _itemSales.clear();
-        // Restore the location field with the saved value
-        _locationController.text = savedLocation;
-      });
     }
-
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
@@ -515,11 +554,21 @@ class _OrderScreenState extends State<OrderScreen> {
                       children: [
                         IconButton(
                           onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => const HomeScreen(initialIndex: 0),
-                              ),
-                            );
+                            if (widget.editOrder != null) {
+                              // If editing, navigate to order list screen
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const OrderListScreen(),
+                                ),
+                              );
+                            } else {
+                              // If creating new order, navigate to home screen
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => const HomeScreen(initialIndex: 0),
+                                ),
+                              );
+                            }
                           },
                           icon: Icon(
                             Icons.arrow_back,
@@ -529,7 +578,7 @@ class _OrderScreenState extends State<OrderScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            widget.editBatch != null ? 'Edit Order' : 'Create Order',
+                            widget.editOrder != null ? 'Edit Order' : 'Create Order',
                             style: TextStyle(
                               fontSize: 28.0,
                               fontWeight: FontWeight.bold,
@@ -697,8 +746,8 @@ class _OrderScreenState extends State<OrderScreen> {
                                     if (_selectedBranch != null &&
                                         _masterItems.isNotEmpty) ...[
                                       Text(
-                                        widget.editBatch != null
-                                            ? 'Ordered Items (${_filteredItems.length})'
+                                        widget.editOrder != null
+                                            ? 'Edit Order Items'
                                             : 'Select Items to Order',
                                         style: TextStyle(
                                           fontSize: 18,
@@ -706,7 +755,33 @@ class _OrderScreenState extends State<OrderScreen> {
                                           color: isDarkMode ? Colors.white : Color(0xFF0651A4),
                                         ),
                                       ),
-                                      if (widget.editBatch == null) ...[
+                                      if (widget.editOrder != null) ...[
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.info, color: Colors.blue),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'You are editing an existing order. Modify quantities as needed.',
+                                                  style: TextStyle(
+                                                    color: Colors.blue.shade700,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      if (widget.editOrder == null) ...[
                                         Container(
                                           decoration: BoxDecoration(
                                             color: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
@@ -752,19 +827,26 @@ class _OrderScreenState extends State<OrderScreen> {
                                           itemCount: _filteredItems.length,
                                           itemBuilder: (context, index) {
                                             final item = _filteredItems[index];
+                                            final isOrderedItem = widget.editOrder != null && item.id == widget.editOrder!.itemId;
+                                            final hasQuantity = _orderQuantities[item.id ?? 0] != null && _orderQuantities[item.id ?? 0]! > 0;
+
                                             return Card(
                                               margin:
                                                   const EdgeInsets.symmetric(
                                                     horizontal: 8,
                                                     vertical: 4,
                                                   ),
-                                              elevation: 4,
+                                              elevation: isOrderedItem ? 8 : 4,
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(15),
+                                                side: isOrderedItem ? BorderSide(
+                                                  color: Colors.blue,
+                                                  width: 2,
+                                                ) : BorderSide.none,
                                               ),
                                               color: isDarkMode ? Colors.grey[800] : Colors.white,
-                                              shadowColor: const Color(
+                                              shadowColor: isOrderedItem ? Colors.blue.withValues(alpha: 0.3) : const Color(
                                                 0xFF0651A4,
                                               ).withValues(alpha: isDarkMode ? 0.5 : 0.2),
                                               child: Padding(
@@ -774,6 +856,32 @@ class _OrderScreenState extends State<OrderScreen> {
                                                 child: Column(
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
+                                                    if (isOrderedItem) ...[
+                                                      Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                        margin: const EdgeInsets.only(bottom: 8),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.blue.withValues(alpha: 0.1),
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Icon(Icons.edit, size: 16, color: Colors.blue),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'Currently Ordered',
+                                                              style: TextStyle(
+                                                                color: Colors.blue.shade700,
+                                                                fontSize: 12,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
                                                     Column(
                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                       children: [
@@ -952,7 +1060,7 @@ class _OrderScreenState extends State<OrderScreen> {
                                     )
                                   : const Icon(Icons.send),
                               label: Text(
-                                _isLoading ? 'Submitting...' : (widget.editBatch != null ? 'Update Order' : 'Submit Order'),
+                                _isLoading ? 'Submitting...' : (widget.editOrder != null ? 'Update Order' : 'Submit Order'),
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -1017,44 +1125,43 @@ class _OrderScreenState extends State<OrderScreen> {
     String? value,
     bool readOnly = false,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[700] : Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 14,
-                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-              ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title with icon
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                 ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          if (readOnly && value != null) ...[
-            Text(
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Value/Input area
+        if (readOnly && value != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[700] : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
               value,
               style: TextStyle(
                 fontSize: 16,
@@ -1062,40 +1169,50 @@ class _OrderScreenState extends State<OrderScreen> {
                 color: isDarkMode ? Colors.white : Color(0xFF0651A4),
               ),
               textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
             ),
-          ] else if (controller != null) ...[
-            SizedBox(
-              height: 28,
-              child: TextField(
-                controller: controller,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                ),
-                decoration: InputDecoration(
-                  hintText: '0',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    borderSide: BorderSide(
-                      color: isDarkMode ? Colors.white24 : Colors.grey.shade300,
-                    ),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  isDense: true,
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                onChanged: onChanged,
+          ),
+        ] else if (controller != null) ...[
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[600] : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDarkMode ? Colors.white38 : Colors.grey.shade300,
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+              ),
+              decoration: const InputDecoration(
+                hintText: '0',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              onChanged: onChanged,
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }

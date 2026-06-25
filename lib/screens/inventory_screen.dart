@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' as drift hide Column;
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/widgets/filter_widget.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -11,12 +13,19 @@ import 'package:share_plus/share_plus.dart';
 import 'package:open_file/open_file.dart';
 import 'package:logging/logging.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:warehouse_inventory/utils/user_helper.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key, this.initialBranch, this.showLowStockOnly = false});
+  const InventoryScreen({
+    super.key, 
+    this.initialBranch, 
+    this.showLowStockOnly = false,
+    this.editBatchOrders,
+  });
 
   final Branch? initialBranch;
   final bool showLowStockOnly;
+  final List<Order>? editBatchOrders;
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -33,11 +42,35 @@ class _InventoryScreenState extends State<InventoryScreen> {
   bool _isExporting = false; // Prevent multiple concurrent exports
   String _searchQuery = '';
   String _branchSearchQuery = '';
+  
+  // Order editing variables
+  bool _isEditMode = false;
+  List<Order> _editBatchOrders = [];
+  Map<int, TextEditingController> _orderQuantityControllers = {};
+  Map<int, int> _orderQuantities = {};
+  String _orderLocation = '';
 
   @override
   void initState() {
     super.initState();
     _initializeLogger();
+    
+    // Check if we're in edit mode
+    if (widget.editBatchOrders != null && widget.editBatchOrders!.isNotEmpty) {
+      _isEditMode = true;
+      _editBatchOrders = widget.editBatchOrders!;
+      
+      // Set the branch from the first order
+      final firstOrder = _editBatchOrders.first;
+      _orderLocation = firstOrder.location;
+      
+      // Initialize order quantity controllers
+      for (final order in _editBatchOrders) {
+        _orderQuantityControllers[order.itemId] = TextEditingController(text: order.quantity.toString());
+        _orderQuantities[order.itemId] = order.quantity;
+      }
+    }
+    
     _loadBranches();
   }
 
@@ -137,7 +170,7 @@ Future<void> _loadInventoryItems() async {
         if (widget.showLowStockOnly) {
           final maintainingInventory = int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10;
           final lowStockThreshold = maintainingInventory - 1;
-          filteredItems = items.where((item) => item.end <= lowStockThreshold).toList();
+          filteredItems = items.where((item) => (item.sales ?? item.end) <= lowStockThreshold).toList();
         }
         setState(() {
           _inventoryItems = items;
@@ -186,6 +219,150 @@ Future<void> _loadInventoryItems() async {
     });
   }
 
+  Widget _buildInfoRow(String label, String value) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRowWithDate(String label, String value, String? date) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                if (date != null) Text(
+                  DateFormat('MMM dd, yyyy').format(DateTime.parse(date)),
+                  style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(value, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputRow(String label, TextEditingController controller, Function(String) onChanged) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+          ),
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputRowWithDate(String label, TextEditingController controller, DateTime date, Function(String) onChanged) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('Date: ${DateFormat('MMM dd, yyyy').format(date)}', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 14)),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalculationRow(String label, String value, bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[600]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 // Test method to debug the export process
   void _testInventoryData() {
     if (_selectedBranch == null) {
@@ -193,17 +370,12 @@ Future<void> _loadInventoryItems() async {
       return;
     }
      
-    if (_inventoryItems.isEmpty) {
-      _logger.warning('❌ No inventory items found for branch: ${_selectedBranch!.name}');
-      _logger.fine('Branch ID: ${_selectedBranch!.id}');
-      return;
-    }
+
      
-    _logger.info('✅ Data verification:');
+    _logger.info('✅ Data verification for export:');
     _logger.fine('Branch: ${_selectedBranch!.name}');
-    _logger.fine('Total items: ${_inventoryItems.length}');
-    _logger.fine('First item: ${_inventoryItems.first.sku} - ${_inventoryItems.first.description} - Qty: ${_inventoryItems.first.end}');
-    _logger.fine('Last item: ${_inventoryItems.last.sku} - ${_inventoryItems.last.description} - Qty: ${_inventoryItems.last.end}');
+    _logger.fine('Branch ID: ${_selectedBranch!.id}');
+    _logger.fine('Will fetch fresh data directly from database for export');
   }
 
   Future<void> _exportInventoryToFile() async {
@@ -220,11 +392,11 @@ Future<void> _loadInventoryItems() async {
       return;
     }
 
-    if (_selectedBranch == null || _inventoryItems.isEmpty) {
+    if (_selectedBranch == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No inventory data to export'),
+            content: Text('No branch selected'),
             backgroundColor: Colors.red,
           ),
         );
@@ -258,8 +430,15 @@ Future<void> _loadInventoryItems() async {
       final String branchCode = _selectedBranch!.code ?? _selectedBranch!.id.toString(); // Use branch code from master data, fallback to ID
       final String fileName = '${branchCode}_${branchName}_${currentDate}.xlsx';
       
-      // Run the export operation
-      final exportResult = await _performExportInBackground(_inventoryItems, fileName);
+      // Fetch fresh inventory data directly from database to ensure we have the latest updates
+      final freshInventoryItems = await AppDatabase.instance.getInventoryItemsByBranch(
+        _selectedBranch!.id,
+      );
+      
+      _logger.info('📤 Exporting ${freshInventoryItems.length} items with fresh database data');
+      
+      // Run the export operation with fresh data
+      final exportResult = await _performExportInBackground(freshInventoryItems, fileName);
       
       if (exportResult['success'] == true) {
         final String filePath = exportResult['path'];
@@ -270,10 +449,11 @@ Future<void> _loadInventoryItems() async {
         _logger.fine('File saved at: $filePath');
         _logger.fine('File exists: ${await file.exists()}');
         _logger.fine('File size: ${await file.length()} bytes');
+        _logger.fine('Items exported: ${freshInventoryItems.length}');
         
         if (mounted) {
-          // Show options to user
-          _showExportOptions(file, fileName);
+          // Show options to user with correct item count
+          _showExportOptions(file, fileName, freshInventoryItems.length);
         }
       } else {
         throw Exception(exportResult['error'] ?? 'Unknown export error');
@@ -307,7 +487,7 @@ Future<void> _loadInventoryItems() async {
   }
 
   // Show export options dialog
-  void _showExportOptions(File file, String fileName) {
+  void _showExportOptions(File file, String fileName, int itemCount) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     showDialog(
@@ -359,10 +539,37 @@ Future<void> _loadInventoryItems() async {
               ),
               const SizedBox(height: 8),
               Text(
-                'Items exported: ${_inventoryItems.length}',
+                'Items exported: $itemCount',
                 style: TextStyle(
                   color: isDarkMode ? Colors.white70 : Colors.black87,
                   fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: isDarkMode ? 0.2 : 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Includes user export information',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -392,7 +599,7 @@ Future<void> _loadInventoryItems() async {
                   await Share.shareXFiles(
                     [XFile(file.path, mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
                     subject: 'Inventory Export - ${_selectedBranch!.name}',
-                    text: 'Here is the inventory export for ${_selectedBranch!.name}',
+                    text: 'Here is the inventory export for ${_selectedBranch!.name}. This export includes user information for accountability.',
                   );
                 } catch (e) {
                   if (mounted) {
@@ -453,6 +660,15 @@ Future<void> _loadInventoryItems() async {
     String fileName,
   ) async {
     try {
+      // Get current user information
+      final userInfo = await UserHelper.getCurrentUser();
+      final username = userInfo?['username'] ?? 'Unknown User';
+      final userRole = userInfo?['role'] ?? 'user';
+      final currentTimestamp = DateTime.now().toIso8601String();
+      
+      // Log the export activity
+      _logger.info('📤 Export initiated by user: $username (Role: $userRole) for branch: ${_selectedBranch?.name}');
+      
       // Create Excel workbook
       final excel = Excel.createExcel();
       
@@ -468,26 +684,36 @@ Future<void> _loadInventoryItems() async {
       });
       
       // Add headers
-      sheet.appendRow(['SKU', 'Description', 'Brand', 'Location', 'Quantity', 'Beg', 'Prev', 'Sales']);
+      sheet.appendRow(['SKU', 'Description', 'Actual Count', 'Actual Order', 'Date', 'User']);
       
       // Add data rows - simplified to avoid batch processing issues
       for (int i = 0; i < items.length; i++) {
         final item = items[i];
-        final brand = item.brand ?? 'N/A';
         final description = item.description;
-        final beg = item.beg?.toString() ?? 'N/A';
-        final prev = item.prev?.toString() ?? 'N/A';
-        final sales = item.sales?.toString() ?? 'N/A';
+        final actualCount = item.sales?.toString() ?? item.end.toString(); 
+        // item.sales stores the actual count entered by user in inventory update dialog
+        // item.end is the original imported count (fallback if no actual count was entered)
+        final formattedDate = item.dateAdded != null 
+          ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!))
+          : 'Unknown';
+        
+        // Get actual order quantity for this item
+        int actualOrderQuantity = 0;
+        try {
+          final orders = await AppDatabase.instance.getOrdersByItem(item.id);
+          actualOrderQuantity = orders.fold<int>(0, (sum, order) => sum + order.quantity);
+        } catch (e) {
+          _logger.warning('Could not fetch orders for item ${item.sku}: $e');
+          actualOrderQuantity = 0;
+        }
         
         sheet.appendRow([
           item.sku,
           description,
-          brand,
-          item.location.toString(),
-          item.end.toString(),
-          beg,
-          prev,
-          sales
+          actualCount,
+          actualOrderQuantity.toString(),
+          formattedDate,
+          username // Current user who exported the data
         ]);
         
         // Add small delay every 100 items to prevent UI blocking
@@ -495,6 +721,14 @@ Future<void> _loadInventoryItems() async {
           await Future.delayed(const Duration(milliseconds: 1));
         }
       }
+
+      // Add user information at the bottom of the file
+      sheet.appendRow(['']); // Empty row for spacing
+      sheet.appendRow(['Export Information']);
+      sheet.appendRow(['Prepared by:', username]);
+      sheet.appendRow(['Code', _selectedBranch?.code ?? 'Unknown']);
+      sheet.appendRow(['Export Date:', DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())]);
+      sheet.appendRow(['Branch:', _selectedBranch?.name ?? 'Unknown']);
 
       // Encode Excel data once
       final bytes = excel.encode();
@@ -678,6 +912,18 @@ Future<void> _loadInventoryItems() async {
     final reorderPoint = weeklyOfftake * weeklyReorderPoint;
     final maintainingInventory = double.tryParse(_selectedBranch?.maintainingInventory ?? '0') ?? 0;
     final maintinvty = (item.sales ?? 0) * maintainingInventory;
+    final TextEditingController prevDeliveryController = TextEditingController(text: item.prev?.toString() ?? '');
+    // Use sales field to store actual count, keep end as imported count
+    final TextEditingController actualCountController = TextEditingController(text: (item.sales ?? item.end).toString());
+    final TextEditingController actualOrderController = TextEditingController();
+    DateTime selectedDate = item.dateAdded != null ? DateTime.parse(item.dateAdded!) : DateTime.now();
+    final proposedOrder = max(0.0, maintinvty - (item.sales ?? item.end).toDouble());
+    int calculatedSales = (item.prev ?? 0) - (item.sales ?? item.end);
+    double weeklySales = calculatedSales / weeklyOrderOfftake;
+    double reorderPt = weeklySales * weeklyReorderPoint;
+    double maintInvty = calculatedSales * maintainingInventory;
+    double proposedOrd = max(0.0, maintInvty - (item.sales ?? item.end).toDouble());
+    bool showSubmitButton = false;
 
     // Helper function to format doubles to 2 decimal places if not whole
     String formatDouble(double value) {
@@ -687,7 +933,9 @@ Future<void> _loadInventoryItems() async {
     await showDialog(
       context: context,
       builder: (BuildContext context) {
-        return Dialog(
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
           ),
@@ -715,17 +963,39 @@ Future<void> _loadInventoryItems() async {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info, color: Colors.white, size: 28),
+                        const Icon(Icons.business, color: Colors.white, size: 28),
                         const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Current Values',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _selectedBranch?.name ?? 'Unknown Branch',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                softWrap: true,
+                                overflow: TextOverflow.visible,
+                              ),
+                              if (_selectedBranch?.code != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  '(${_selectedBranch!.code})',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  softWrap: true,
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ],
@@ -741,242 +1011,547 @@ Future<void> _loadInventoryItems() async {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // SKU
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.qr_code,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
+                            SizedBox(
+                              width: 100,
+                              child: Text('SKU:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'SKU: ${item.sku}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.description,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Description: ${item.description}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                item.sku,
+                                style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16),
+                                softWrap: true,
+                                overflow: TextOverflow.visible,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Description
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Text('Description:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item.description,
+                                style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16),
+                                softWrap: true,
+                                overflow: TextOverflow.visible,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Brand
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Text('Brand:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item.brand ?? 'N/A',
+                                style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16),
+                                softWrap: true,
+                                overflow: TextOverflow.visible,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Count (Quantity)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                                  if (item.dateAdded != null)
+                                    Text(
+                                      DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)),
+                                      style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                item.end.toString(),
+                                style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 16, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // prev delivery
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Text('Prev Delivery:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: prevDeliveryController,
+                                keyboardType: TextInputType.number,
+                                onChanged: (value) {
+                                  final prev = int.tryParse(value) ?? 0;
+                                  final actual = int.tryParse(actualCountController.text) ?? item.end;
+                                  setDialogState(() {
+                                    calculatedSales = prev - actual;
+                                    weeklySales = calculatedSales / weeklyOrderOfftake;
+                                    reorderPt = weeklySales * weeklyReorderPoint;
+                                    maintInvty = calculatedSales * maintainingInventory;
+                                    proposedOrd = max(0.0, maintInvty - actual.toDouble());
+                                  });
+                                },
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  isDense: true,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 16),
+                        // actual count
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Actual Count:', style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: () async {
+                                      final DateTime? picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: selectedDate,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2101),
+                                      );
+                                      if (picked != null && picked != selectedDate) {
+                                        setDialogState(() {
+                                          selectedDate = picked;
+                                        });
+                                        
+                                        // Auto-save the date when picked
+                                        try {
+                                          final updatedItem = InventoryItem(
+                                            id: item.id,
+                                            sku: item.sku,
+                                            description: item.description,
+                                            end: item.end,
+                                            location: item.location,
+                                            brand: item.brand,
+                                            dateAdded: picked.toIso8601String(),
+                                            lastUpdated: DateTime.now().toIso8601String(),
+                                            branchId: item.branchId,
+                                            beg: item.beg,
+                                            prev: item.prev,
+                                            sales: item.sales,
+                                          );
+                                          
+                                          await AppDatabase.instance.updateInventoryItem(updatedItem);
+                                          
+                                          // Show success message
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Date updated successfully'),
+                                              backgroundColor: Colors.green,
+                                              duration: Duration(seconds: 2),
+                                            ),
+                                          );
+                                          
+                                          // Refresh the inventory items list to reflect the change
+                                          _loadInventoryItems();
+                                          
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error updating date: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.calendar_today, size: 14, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Pick Date',
+                                            style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4), fontSize: 12, fontWeight: FontWeight.w500),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: actualCountController,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      final actual = int.tryParse(value) ?? (item.sales ?? item.end);
+                                      final prev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
+                                      setDialogState(() {
+                                        calculatedSales = prev - actual;
+                                        weeklySales = calculatedSales / weeklyOrderOfftake;
+                                        reorderPt = weeklySales * weeklyReorderPoint;
+                                        maintInvty = calculatedSales * maintainingInventory;
+                                        proposedOrd = max(0.0, maintInvty - actual.toDouble());
+                                      });
+                                    },
+                                    decoration: InputDecoration(
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                      isDense: true,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 14,
+                                          color: Colors.green,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: Text(
+                                            'Date: ${DateFormat('MMM dd, yyyy').format(selectedDate)}',
+                                            style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.w500),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Calculated values section
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: isDarkMode ? Colors.white30 : Color(0xFF0651A4).withValues(alpha: 0.3)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDarkMode ? 0.1 : 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '📊 Calculated Values',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildCalculationRow(
+                                'Sales (${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'} weeks):',
+                                calculatedSales.toString(),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Weekly Sales:',
+                                formatDouble(weeklySales),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Reorder Point (${_selectedBranch?.weeklyReorderPoint ?? 'N/A'} weeks):',
+                                formatDouble(reorderPt),
+                                isDarkMode,
+                              ),
+                              _buildCalculationRow(
+                                'Maint Inventory (${_selectedBranch?.maintainingInventory ?? 'N/A'} x sales):',
+                                formatDouble(maintInvty),
+                                isDarkMode,
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode ? Color(0xFF1E3A5F).withValues(alpha: 0.5) : Color(0xFF0651A4).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: isDarkMode ? Colors.white24 : Color(0xFF0651A4).withValues(alpha: 0.2)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.shopping_cart,
+                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Proposed Order:',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      formatDouble(proposedOrd),
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                         Row(
                           children: [
-                            Icon(
-                              Icons.branding_watermark,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Brand: ${item.brand}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.update,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Last Updated:',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                    fontWeight: FontWeight.bold,
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 28),
-                              child: Text(
-                                item.lastUpdated != null
-                                  ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!))
-                                  : 'Never',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  fontSize: 14,
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(fontSize: 16),
                                 ),
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Location: ${item.location}',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.business,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  size: 20,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  // Update logic
+                                  final newPrev = int.tryParse(prevDeliveryController.text) ?? item.prev ?? 0;
+                                  final newActualCount = int.tryParse(actualCountController.text) ?? (item.sales ?? item.end);
+                                  final newSales = calculatedSales;
+                                  
+                                  // Validate that calculated values are not negative
+                                  if (calculatedSales < 0 || weeklySales < 0 || reorderPt < 0 || maintInvty < 0) {
+                                    if (mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (BuildContext context) {
+                                          return AlertDialog(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            backgroundColor: isDarkMode ? Colors.grey[850] : Colors.white,
+                                            title: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.warning,
+                                                  color: Colors.red,
+                                                  size: 28,
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Text(
+                                                    'Invalid Values',
+                                                    style: TextStyle(
+                                                      color: isDarkMode ? Colors.white : Color(0xFF0651A4),
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            content: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'The update would result in negative calculated values. Please adjust your inputs.',
+                                                  style: TextStyle(
+                                                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                                                    fontSize: 16,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Container(
+                                                  padding: const EdgeInsets.all(12),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.red.withValues(alpha: isDarkMode ? 0.2 : 0.1),
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    border: Border.all(color: Colors.red.withValues(alpha: isDarkMode ? 0.3 : 0.2)),
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Negative values detected:',
+                                                        style: TextStyle(
+                                                          color: Colors.red,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                      if (calculatedSales < 0)
+                                                        Text(
+                                                          '• Sales: $calculatedSales (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (weeklySales < 0)
+                                                        Text(
+                                                          '• Weekly Sales: ${formatDouble(weeklySales)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (reorderPt < 0)
+                                                        Text(
+                                                          '• Reorder Point: ${formatDouble(reorderPt)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                      if (maintInvty < 0)
+                                                        Text(
+                                                          '• Maintenance Inventory: ${formatDouble(maintInvty)} (should be ≥ 0)',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.of(context).pop(),
+                                                style: TextButton.styleFrom(
+                                                  foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
+                                                ),
+                                                child: Text(
+                                                  'OK',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  
+                                  // Update the item - keep end as imported count, store actual count in sales field
+                                  final updatedItem = InventoryItem(
+                                    id: item.id,
+                                    sku: item.sku,
+                                    description: item.description,
+                                    end: item.end, // Keep original imported count unchanged
+                                    location: item.location,
+                                    brand: item.brand,
+                                    dateAdded: selectedDate.toIso8601String(),
+                                    lastUpdated: DateTime.now().toIso8601String(),
+                                    branchId: item.branchId,
+                                    beg: item.beg, // keep
+                                    prev: newPrev == 0 ? null : newPrev,
+                                    sales: newActualCount == 0 ? null : newActualCount, // Store actual count here
+                                  );
+                                  try {
+                                    await AppDatabase.instance.updateInventoryItem(updatedItem);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Updated successfully')),
+                                    );
+                                    Navigator.of(context).pop();
+                                    _loadInventoryItems();
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error updating: $e')),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  elevation: 4,
+                                  shadowColor: const Color(
+                                    0xFF0651A4,
+                                  ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
                                 ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Branch:',
+                                child: const Text(
+                                  'Update',
                                   style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 28),
-                              child: Text(
-                                '${_selectedBranch?.name ?? 'Unknown'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.shopping_cart,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Weekly Order Offtake:',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 28),
-                              child: Text(
-                                '${_selectedBranch?.weeklyOrderOfftake ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.warning,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Weekly Reorder Point:',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 28),
-                              child: Text(
-                                '${_selectedBranch?.weeklyReorderPoint ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const SizedBox(height: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.inventory,
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Maintaining Inventory:',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 28),
-                              child: Text(
-                                '${_selectedBranch?.maintainingInventory ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                 ),
                               ),
                             ),
@@ -985,222 +1560,103 @@ Future<void> _loadInventoryItems() async {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  // Actual Order Container
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4).withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Current Values:',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Beg: ${item.beg ?? 'N/A'}',
+                        Text('Actual Order', style: TextStyle(color: isDarkMode ? Colors.white : Color(0xFF0651A4), fontWeight: FontWeight.bold, fontSize: 20)),
+                        const SizedBox(height: 12),
+                        _buildInputRow('actual order:', actualOrderController, (value) {
+                          final orderQty = int.tryParse(value) ?? 0;
+                          setDialogState(() {
+                            showSubmitButton = orderQty > 0;
+                          });
+                        }),
+                        if (showSubmitButton) Padding(
+                          padding: EdgeInsets.only(top: 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final orderQty = int.tryParse(actualOrderController.text) ?? 0;
+                                if (orderQty > 0) {
+                                  final order = OrdersCompanion.insert(
+                                    branchId: _selectedBranch!.id,
+                                    location: item.location,
+                                    brand: item.brand ?? '',
+                                    itemId: item.id,
+                                    quantity: orderQty,
+                                    dateOrdered: DateTime.now().toIso8601String(),
+                                    status: drift.Value('pending'),
+                                    batchId: const drift.Value.absent(),
+                                  );
+                                  try {
+                                    await AppDatabase.instance.into(AppDatabase.instance.orders).insert(order);
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text('Order Submitted'),
+                                          content: Text('Your order has been submitted successfully.'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(context).pop(),
+                                              child: Text('OK'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  } catch (e) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) {
+                                        return AlertDialog(
+                                          title: Text('Error'),
+                                          content: Text('Error submitting order: $e'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.of(context).pop(),
+                                              child: Text('OK'),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  }
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                elevation: 4,
+                              ),
+                              child: const Text(
+                                'Submit Order',
                                 style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
-                            Expanded(
-                              child: Text(
-                                'Prev: ${item.prev ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Ending: ${item.end}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                'Sales: ${item.sales ?? 'N/A'}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Total: ${(item.beg ?? 0) + (item.prev ?? 0)}',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Offtake Container
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Offtake',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Inventory Offtake: ${(item.beg ?? 0) + (item.prev ?? 0) - item.end}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Weekly Offtake: ${formatDouble(weeklyOfftake)}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Inventory Control Objective Container
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.grey[700]!.withValues(alpha: 0.3) : Color(0xFF0651A4).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Inventory Control Objective',
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Reorder Point: ${formatDouble(reorderPoint)}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Maintinvty: ${formatDouble(maintinvty)}',
-                                style: TextStyle(
-                                  color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          style: TextButton.styleFrom(
-                            foregroundColor: isDarkMode ? Colors.white70 : Colors.grey,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            _showUpdateFormDialog(item);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 4,
-                            shadowColor: const Color(
-                              0xFF0651A4,
-                            ).withValues(alpha: isDarkMode ? 0.5 : 0.3),
-                          ),
-                          child: const Text(
-                            'Update',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -1208,6 +1664,8 @@ Future<void> _loadInventoryItems() async {
         );
       },
     );
+  },
+);
   }
 
   Future<void> _showUpdateFormDialog(InventoryItem item) async {
@@ -1749,7 +2207,7 @@ await AppDatabase.instance
                         Expanded(
                           child: Text(
                             _branchSelected
-                                ? '${_selectedBranch?.name} Inventory'
+                                ? '${_selectedBranch?.name ?? 'Unknown Branch'} (${_selectedBranch?.code ?? 'Unknown Code'})'
                                 : 'Warehouse Inventory',
                             style: TextStyle(
                               fontSize: 28.0,
@@ -1999,7 +2457,7 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                     ),
                                                   ),
                                                   subtitle: Text(
-'SKU: ${item.sku} | Brand: ${item.brand}\nLast Updated: ${item.lastUpdated != null ? DateFormat('MMM dd, yyyy hh:mm a').format(DateTime.parse(item.lastUpdated!)) : 'Never'}',
+'SKU: ${item.sku} | Brand: ${item.brand}\nCount Date: ${item.dateAdded != null ? DateFormat('MMM dd, yyyy').format(DateTime.parse(item.dateAdded!)) : 'Unknown'}',
                                                     style: TextStyle(
                                                       color: isDarkMode ? Colors.white70 : Colors.black87,
                                                     ),
@@ -2011,7 +2469,7 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                           vertical: 6,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
+                                                      color: (item.sales ?? item.end) <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                           ? Colors.red
                                                                 .withValues(
                                                                   alpha: isDarkMode ? 0.3 : 0.1,
@@ -2026,11 +2484,11 @@ final formattedDate = item.dateAdded.substring(0, 10); // Get YYYY-MM-DD part
                                                           ),
                                                     ),
                                                     child: Text(
-                                                      'Qty: ${item.end}',
+                                                      'Qty: ${item.sales ?? item.end}',
                                                       style: TextStyle(
                                                         fontWeight:
                                                             FontWeight.bold,
-                                                        color: item.end <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
+                                                        color: (item.sales ?? item.end) <= (int.tryParse(_selectedBranch?.maintainingInventory ?? '10') ?? 10) - 1
                                                             ? Colors.red
                                                             : Colors.green,
                                                       ),
@@ -2086,7 +2544,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
       return branch.name.toLowerCase().contains(
             _branchSearchQuery.toLowerCase(),
           ) ||
-          branch.location.toLowerCase().contains(
+          (branch.code?.toLowerCase() ?? '').contains(
             _branchSearchQuery.toLowerCase(),
           );
     }).toList();
@@ -2101,7 +2559,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
           decoration: InputDecoration(
             labelText: 'Search Branches',
             labelStyle: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
-            hintText: 'Search by name or location',
+            hintText: 'Search by name or code',
             prefixIcon: Icon(Icons.search, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
@@ -2144,7 +2602,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
               return ListTile(
                 leading: Icon(Icons.business, color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 title: Text(
-                  '${branch.name} (${branch.location})',
+                  '${branch.name} (${branch.code ?? branch.id.toString()})',
                   style: TextStyle(color: isDarkMode ? Colors.white70 : Color(0xFF0651A4)),
                 ),
                 onTap: () {
@@ -2187,7 +2645,7 @@ floatingActionButton: _branchSelected && _inventoryItems.isNotEmpty
             return DropdownMenuItem<Branch>(
               value: branch,
               child: Text(
-                '${branch.name} (${branch.location})',
+                '${branch.name} (${branch.code ?? branch.id.toString()})',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,

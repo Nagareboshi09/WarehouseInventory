@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:warehouse_inventory/database/app_database.dart';
 import 'package:warehouse_inventory/screens/home_screen.dart';
 
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,6 +20,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isPasswordVisible = false;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
+  bool _isDarkMode = false;
+  
+  final double _dialogTitleSpacing = 10.0;
+  final double _dialogFieldSpacing = 16.0;
 
   @override
   void initState() {
@@ -48,12 +53,11 @@ class _LoginScreenState extends State<LoginScreen>
 
       try {
         final user = await AppDatabase.instance.getUser(
-          _usernameController.text,
+          _usernameController.text.trim(),
           _passwordController.text,
         );
 
         if (user != null) {
-          // Save login state
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLoggedIn', true);
           await prefs.setString('username', user.username);
@@ -61,14 +65,12 @@ class _LoginScreenState extends State<LoginScreen>
 
           if (!mounted) return;
 
-          // Navigate to home screen
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         } else {
           if (!mounted) return;
 
-          // Show error message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Invalid username or password'),
@@ -79,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen>
       } catch (e) {
         if (!mounted) return;
 
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: ${e.toString()}'),
@@ -96,16 +97,143 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  void _showAdminAccountCreationDialog() {
+    final adminUsernameController = TextEditingController();
+    final adminPasswordController = TextEditingController();
+    final formKeyAdmin = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(
+                Icons.admin_panel_settings,
+                color: _isDarkMode ? Colors.white : Color(0xFF0651A4),
+              ),
+              Expanded(
+                child: SizedBox(
+                  width: 100,
+                  child: const Text(
+                  'Create Admin Account',  
+                  softWrap: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKeyAdmin,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: adminUsernameController,
+                    decoration: InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      prefixIcon: const Icon(Icons.person),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter username';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: _dialogFieldSpacing),
+                  TextFormField(
+                    controller: adminPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      prefixIcon: const Icon(Icons.lock),
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKeyAdmin.currentState!.validate()) {
+                  try {
+                    await AppDatabase.instance.registerUser(
+                      adminUsernameController.text.trim(),
+                      adminPasswordController.text,
+                      role: 'admin',
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Admin account created successfully!'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error creating admin account: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Create Admin'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    _isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: isDarkMode
+            colors: _isDarkMode
                 ? [Color(0xFF1E1E1E), Color(0xFF2D2D2D), Color(0xFF3A3A3A)]
                 : [Color(0xFF0651A4), Color(0xFF0A7BFF), Color(0xFF42A5F5)],
           ),
@@ -121,7 +249,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -133,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
+                  color: _isDarkMode ? Colors.white.withOpacity(0.08) : Colors.white.withOpacity(0.15),
                 ),
               ),
             ),
@@ -145,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
+                  color: _isDarkMode ? Colors.white.withOpacity(0.05) : Colors.white.withOpacity(0.1),
                 ),
               ),
             ),
@@ -157,7 +285,7 @@ class _LoginScreenState extends State<LoginScreen>
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+                  color: _isDarkMode ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
                 ),
               ),
             ),
@@ -175,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen>
                           child: Icon(
                             Icons.inventory,
                             size: 80,
-                            color: isDarkMode ? Colors.white70 : Colors.white,
+                            color: _isDarkMode ? Colors.white70 : Colors.white,
                           ),
                         );
                       },
@@ -205,8 +333,8 @@ class _LoginScreenState extends State<LoginScreen>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),
                         ),
-                        color: isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
-                        shadowColor: const Color(0xFF0651A4).withOpacity(isDarkMode ? 0.5 : 0.2),
+                        color: _isDarkMode ? Colors.grey[850]!.withOpacity(0.95) : Colors.white.withOpacity(0.95),
+                        shadowColor: const Color(0xFF0651A4).withOpacity(_isDarkMode ? 0.5 : 0.2),
                         child: Padding(
                           padding: const EdgeInsets.all(32.0),
                           child: Form(
@@ -219,47 +347,38 @@ class _LoginScreenState extends State<LoginScreen>
                                   style: TextStyle(
                                     fontSize: 26,
                                     fontWeight: FontWeight.bold,
-                                    color: isDarkMode ? Colors.white : Color(0xFF0651A4),
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Sign in to your account',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: isDarkMode ? Colors.white70 : Colors.grey,
+                                    color: _isDarkMode ? Colors.white : Color(0xFF0651A4),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 32),
                                 TextFormField(
                                   controller: _usernameController,
-                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                  style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black),
                                   decoration: InputDecoration(
                                     labelText: 'Username',
                                     labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
                                       borderSide: BorderSide(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
                                       borderSide: BorderSide(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         width: 2,
                                       ),
                                     ),
                                     prefixIcon: Icon(
                                       Icons.person,
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     filled: true,
-                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                    fillColor: _isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
@@ -271,28 +390,28 @@ class _LoginScreenState extends State<LoginScreen>
                                 const SizedBox(height: 20),
                                 TextFormField(
                                   controller: _passwordController,
-                                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                                  style: TextStyle(color: _isDarkMode ? Colors.white : Colors.black),
                                   decoration: InputDecoration(
                                     labelText: 'Password',
                                     labelStyle: TextStyle(
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
                                       borderSide: BorderSide(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                       ),
                                     ),
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(20),
                                       borderSide: BorderSide(
-                                        color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                        color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                         width: 2,
                                       ),
                                     ),
                                     prefixIcon: Icon(
                                       Icons.lock,
-                                      color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                      color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                     ),
                                     suffixIcon: Container(
                                       margin: const EdgeInsets.only(right: 8),
@@ -301,13 +420,12 @@ class _LoginScreenState extends State<LoginScreen>
                                           _isPasswordVisible
                                               ? Icons.visibility
                                               : Icons.visibility_off,
-                                          color: isDarkMode ? Colors.white70 : Color(0xFF0651A4),
+                                          color: _isDarkMode ? Colors.white70 : Color(0xFF0651A4),
                                           size: 24,
                                         ),
                                         onPressed: () {
                                           setState(() {
-                                            _isPasswordVisible =
-                                                !_isPasswordVisible;
+                                            _isPasswordVisible = !_isPasswordVisible;
                                           });
                                         },
                                         splashRadius: 24,
@@ -316,7 +434,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       ),
                                     ),
                                     filled: true,
-                                    fillColor: isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
+                                    fillColor: _isDarkMode ? Colors.grey[800] : Colors.grey.shade50,
                                   ),
                                   obscureText: !_isPasswordVisible,
                                   validator: (value) {
@@ -330,31 +448,23 @@ class _LoginScreenState extends State<LoginScreen>
                                 ElevatedButton(
                                   onPressed: _isLoading ? null : _login,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                                    backgroundColor: _isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     elevation: 6,
-                                    shadowColor: const Color(
-                                      0xFF0651A4,
-                                    ).withOpacity(isDarkMode ? 0.5 : 0.4),
+                                    shadowColor: const Color(0xFF0651A4).withOpacity(_isDarkMode ? 0.5 : 0.4),
                                   ),
                                   child: _isLoading
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.white,
-                                        )
+                                      ? const CircularProgressIndicator(color: Colors.white)
                                       : const Text(
                                           'Login',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                         ),
                                 ),
+
                               ],
                             ),
                           ),
@@ -362,6 +472,20 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            // Admin button for account creation
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: FloatingActionButton(
+                mini: true,
+                onPressed: _showAdminAccountCreationDialog,
+                backgroundColor: _isDarkMode ? Color(0xFF1E3A5F) : Color(0xFF0651A4),
+                child: Icon(
+                  Icons.admin_panel_settings,
+                  color: Colors.white,
                 ),
               ),
             ),

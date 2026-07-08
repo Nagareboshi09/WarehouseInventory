@@ -35,41 +35,6 @@ A cross-platform Flutter application for managing warehouse inventory across mul
 
 ---
 
-## Project Structure
-
-```
-lib/
-├── main.dart                    # App entry, providers, theme setup
-├── theme_notifier.dart          # Dark/light mode state
-├── widget/
-│   ├── item_form_fields.dart    # Reusable inventory item form
-│   └── filter_widget.dart       # Search/filter UI component
-├── providers/
-│   └── order_provider.dart      # Order CRUD + state
-├── database/
-│   ├── app_database.dart        # Drift tables, DAOs, migrations
-│   └── app_database.g.dart      # Generated Drift code
-├── utils/
-│   └── user_helper.dart         # User auth helpers
-├── screens/
-│   ├── login_screen.dart        # Login / registration
-│   ├── home_screen.dart         # Main navigation hub
-│   ├── dashboard_screen.dart    # Analytics & charts
-│   ├── inventory_screen.dart    # Stock list & search
-│   ├── add_inventory_item_screen.dart
-│   ├── master_data_screen.dart  # SKU master management
-│   ├── edit_master_item_screen.dart
-│   ├── order_screen.dart        # New order form
-│   ├── order_list_screen.dart   # Order history & batch actions
-│   ├── add_branch_screen.dart   # Branch creation
-│   ├── edit_branch_screen.dart  # Branch editing
-│   ├── account_screen.dart      # User profile & role settings
-│   └── settings_screen.dart     # App preferences
-test/
-└── widget_test.dart             # Flutter widget tests
-```
-
----
 
 ## Database Schema
 
